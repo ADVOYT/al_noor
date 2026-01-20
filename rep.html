@@ -12,7 +12,6 @@
             text-align: right;
         }
         
-        /* توحيد الأرقام الإنجليزية ومنع تحويلها */
          .score-input, .total, .student-name {
             font-family: 'Arial', sans-serif !important;
             direction: ltr !important;
@@ -24,48 +23,59 @@
             direction: rtl !important;
         }
 
-        /* تنسيق أسهم الزيادة والنقصان */
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { 
-            opacity: 1;
-            height: 30px;
-            cursor: pointer;
+        /* تنسيق الأزرار الصغيرة للجوال */
+        .btn-step {
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #E5E7EB;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            transition: all 0.2s;
+            user-select: none;
         }
+        .btn-step:active { background-color: #D1D5DB; transform: scale(0.9); }
+
+        /* إخفاء الأسهم الافتراضية لتوحيد الشكل */
+        input::-webkit-outer-spin-button,
+        input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
 
         @media print { .no-print { display: none !important; } }
     </style>
 </head>
 
-<body class="bg-[#F5F7F4] p-4 md:p-10">
+<body class="bg-[#F5F7F4] p-2 md:p-10">
 
-<div class="max-w-6xl mx-auto bg-white p-8 rounded-3xl shadow-xl">
+<div class="max-w-6xl mx-auto bg-white p-4 md:p-8 rounded-3xl shadow-xl">
 
     <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
         <div class="flex flex-wrap gap-2 no-print">
             <a href="index.html" class="bg-gray-100 px-4 py-2 rounded-full hover:bg-gray-200 transition">⬅ العودة</a>
-            <button onclick="saveData()" class="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition">💾 حفظ البيانات</button>
-            <button onclick="clearAllData()" class="bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 transition">🗑️ حذف الكل</button>
+            <button onclick="saveData()" class="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition">💾 حفظ</button>
+            <button onclick="clearAllData()" class="bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 transition text-sm">🗑️ حذف الكل</button>
         </div>
-        <h1 class="text-3xl font-bold text-[#2D3C59]">📊 تقرير درجات الطالبات</h1>
+        <h1 class="text-2xl md:text-3xl font-bold text-[#2D3C59]">📊 تقرير درجات الطالبات</h1>
         <button onclick="window.print()" class="bg-[#2D3C59] text-white px-6 py-2 rounded-full no-print hover:bg-slate-700 transition">🖨️ طباعة</button>
     </div>
 
     <div class="mb-4 no-print text-right">
-        <label class="block mb-2 font-semibold text-gray-700">إدخال أسماء الطالبات (كل سطر = طالبة)</label>
-        <textarea id="namesInput" rows="3" placeholder="سارة أحمد..." class="w-full border rounded-lg p-3 mb-2 text-right outline-none focus:ring-2 focus:ring-[#94A378]"></textarea>
-        <button onclick="addStudentsFromTextarea()" class="bg-[#94A378] text-white px-6 py-2 rounded-full shadow hover:bg-[#7a8a5f] transition">➕ إضافة الطالبات</button>
+        <textarea id="namesInput" rows="2" placeholder="أدخلي الأسماء هنا (كل اسم في سطر)..." class="w-full border rounded-lg p-3 mb-2 text-right outline-none focus:ring-2 focus:ring-[#94A378]"></textarea>
+        <button onclick="addStudentsFromTextarea()" class="bg-[#94A378] text-white w-full md:w-auto px-8 py-2 rounded-full shadow hover:bg-[#7a8a5f] transition">➕ إضافة الطالبات</button>
     </div>
 
     <div class="overflow-x-auto">
-        <table class="w-full text-center border-collapse">
+        <table class="w-full text-center border-collapse min-w-[600px]">
             <thead>
                 <tr class="bg-[#94A378] text-white">
-                    <th class="p-4 text-right">اسم الطالبة</th>
-                    <th class="p-4">الحضور (10)</th>
-                    <th class="p-4">المراجعة (15)</th>
-                    <th class="p-4">الاختبار (25)</th>
-                    <th class="p-4">المجموع (50)</th>
-                    <th class="p-4 no-print">إجراء</th>
+                    <th class="p-3 text-right">اسم الطالبة</th>
+                    <th class="p-3">الحضور (10)</th>
+                    <th class="p-3">المراجعة (15)</th>
+                    <th class="p-3">الاختبار (25)</th>
+                    <th class="p-3">المجموع (50)</th>
+                    <th class="p-3 no-print">إجراء</th>
                 </tr>
             </thead>
             <tbody id="reportTable" class="divide-y divide-gray-100"></tbody>
@@ -82,12 +92,29 @@ window.onload = function() {
     }
 };
 
-// دالة إنشاء الحقل مع خاصية الـ step لزيادة ونقصان 0.25
+// دالة إنشاء الحقل مع أزرار الزيادة والنقصان
 function createScoreInput(max, value) {
-    return `<input type="number" value="${value}" min="0" max="${max}" step="0.25" 
-            class="w-24 text-center border rounded font-semibold py-1 score-input" 
-            oninput="validateInput(this, ${max}); updateTotal(this.closest('tr'))"
-            onchange="updateTotal(this.closest('tr'))">`;
+    return `
+    <div class="flex items-center justify-center gap-1">
+        <button type="button" class="btn-step no-print" onclick="changeValue(this, -0.25, ${max})">-</button>
+        <input type="number" value="${value}" min="0" max="${max}" step="0.25" 
+            class="w-16 text-center border rounded font-semibold py-1 score-input text-sm md:text-base" 
+            oninput="validateInput(this, ${max}); updateTotal(this.closest('tr'))">
+        <button type="button" class="btn-step no-print" onclick="changeValue(this, 0.25, ${max})">+</button>
+    </div>`;
+}
+
+// دالة لتغيير القيمة عند الضغط على الأزرار
+function changeValue(btn, step, max) {
+    const input = btn.parentElement.querySelector('input');
+    let currentVal = parseFloat(input.value) || 0;
+    let newVal = currentVal + step;
+    
+    if (newVal > max) newVal = max;
+    if (newVal < 0) newVal = 0;
+    
+    input.value = newVal.toFixed(2);
+    updateTotal(btn.closest('tr'));
 }
 
 function addStudentRow(name = "", h=10, m=15, t=25) {
@@ -95,14 +122,14 @@ function addStudentRow(name = "", h=10, m=15, t=25) {
     row.className = "hover:bg-gray-50 transition";
     row.innerHTML = `
         <td class="p-2">
-            <input type="text" value="${name}" class="student-name border rounded px-2 py-1 w-full outline-none">
+            <input type="text" value="${name}" class="student-name border rounded px-2 py-1 w-full outline-none text-sm md:text-base">
         </td>
         <td class="p-2">${createScoreInput(10, h)}</td>
         <td class="p-2">${createScoreInput(15, m)}</td>
         <td class="p-2">${createScoreInput(25, t)}</td>
-        <td class="p-2 font-bold text-[#2D3C59] total">0.00</td>
+        <td class="p-2 font-bold text-[#2D3C59] total text-sm md:text-base">0.00</td>
         <td class="p-2 text-center no-print">
-            <button onclick="this.closest('tr').remove();" class="text-red-400 hover:text-red-600 text-xl">🗑️</button>
+            <button onclick="this.closest('tr').remove();" class="text-red-400 hover:text-red-600 text-lg">🗑️</button>
         </td>
     `;
     document.getElementById("reportTable").appendChild(row);
@@ -111,20 +138,14 @@ function addStudentRow(name = "", h=10, m=15, t=25) {
 
 function validateInput(input, max) {
     let val = parseFloat(input.value);
-    // منع تجاوز الحد الأعلى
     if (val > max) input.value = max;
-    // منع الدرجات السالبة
     if (val < 0 || isNaN(val)) input.value = 0;
 }
 
 function updateTotal(row) {
     const inputs = row.querySelectorAll(".score-input");
     let total = 0;
-    inputs.forEach(i => {
-        let val = parseFloat(i.value || 0);
-        total += val;
-    });
-    // عرض المجموع برقمين عشريين
+    inputs.forEach(i => total += parseFloat(i.value || 0));
     row.querySelector(".total").innerText = total.toFixed(2);
 }
 
@@ -151,7 +172,7 @@ function saveData() {
 }
 
 function clearAllData() {
-    if (confirm("هل تريدين حذف كافة الطالبات والبيانات؟")) {
+    if (confirm("هل تريدين حذف كافة البيانات؟")) {
         document.getElementById("reportTable").innerHTML = "";
         localStorage.removeItem('studentsData');
     }
