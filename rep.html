@@ -1,37 +1,156 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
+<html lang="en"> <head>
     <meta charset="UTF-8">
     <title>تقرير الدرجات الشهري</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        /* إرجاع اتجاه الصفحة للعربي يدوياً مع الحفاظ على الأرقام إنجليزية */
+        body { 
+            font-family: 'Tajawal', sans-serif; 
+            direction: rtl; 
+            text-align: right;
+        }
+        
+        /* إجبار حقول الأرقام والمجموع على لغة إنجليزية صرفة */
+         .score-input, .total, .student-name {
+            font-family: 'Arial', sans-serif !important;
+            direction: ltr !important; /* لضمان عدم قلب الرقم */
+            unicode-bidi: bidi-override;
+        }
+
+        /* تنسيق الاسم ليكون محاذاة لليمين حتى وهو بالإنجليزية */
+        .student-name {
+            text-align: right !important;
+            direction: rtl !important;
+        }
+
+        /* إظهار أسهم التحكم بالدرجات */
+        input[type=number]::-webkit-inner-spin-button, 
+        input[type=number]::-webkit-outer-spin-button { 
+            opacity: 1;
+            height: 30px;
+            cursor: pointer;
+        }
+
+        @media print { .no-print { display: none !important; } }
+    </style>
 </head>
-<body class="bg-[#F5F7F4] p-4 md:p-10 font-['Tajawal']">
 
-    <div class="max-w-5xl mx-auto bg-white p-8 rounded-3xl shadow-xl">
-        <div class="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <a href="index.html" class="bg-gray-100 px-6 py-2 rounded-full hover:bg-gray-200 transition">⬅ العودة للرئيسية</a>
-            <h1 class="text-3xl font-bold text-[#2D3C59]">📊 تقرير درجات الطالبات (شهري)</h1>
-            <button onclick="window.print()" class="bg-[#2D3C59] text-white px-8 py-2 rounded-full hover:bg-opacity-90 shadow-lg">🖨️ طباعة التقرير</button>
-        </div>
+<body class="bg-[#F5F7F4] p-4 md:p-10">
 
-        <div class="overflow-x-auto">
-            <table class="w-full text-right border-collapse">
-                <thead>
-                    <tr class="bg-[#94A378] text-white">
-                        <th class="p-4 rounded-tr-lg">اسم الطالبة</th>
-                        <th class="p-4">الحضور (10)</th>
-                        <th class="p-4">المراجعة (15)</th>
-                        <th class="p-4">الاختبار (25)</th>
-                        <th class="p-4 rounded-tl-lg">المجموع (50)</th>
-                    </tr>
-                </thead>
-                <tbody id="reportTable" class="divide-y divide-gray-100">
-                    </tbody>
-            </table>
+<div class="max-w-6xl mx-auto bg-white p-8 rounded-3xl shadow-xl">
+
+    <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
+        <div class="flex flex-wrap gap-2 no-print">
+            <a href="index.html" class="bg-gray-100 px-4 py-2 rounded-full hover:bg-gray-200 transition">⬅ العودة</a>
+            <button onclick="saveData()" class="bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition">💾 حفظ البيانات</button>
+            <button onclick="clearAllData()" class="bg-red-500 text-white px-4 py-2 rounded-full hover:bg-red-600 transition">🗑️ حذف الكل</button>
         </div>
+        <h1 class="text-3xl font-bold text-[#2D3C59]">📊 تقرير درجات الطالبات</h1>
+        <button onclick="window.print()" class="bg-[#2D3C59] text-white px-6 py-2 rounded-full no-print hover:bg-slate-700 transition">🖨️ طباعة</button>
     </div>
 
-    <script src="app.js"></script>
+    <div class="mb-4 no-print text-right">
+        <label class="block mb-2 font-semibold text-gray-700">إدخال أسماء الطالبات (كل سطر = طالبة)</label>
+        <textarea id="namesInput" rows="3" placeholder="سارة أحمد..." class="w-full border rounded-lg p-3 mb-2 text-right outline-none focus:ring-2 focus:ring-[#94A378]"></textarea>
+        <button onclick="addStudentsFromTextarea()" class="bg-[#94A378] text-white px-6 py-2 rounded-full shadow hover:bg-[#7a8a5f] transition">➕ إضافة الطالبات</button>
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full text-center border-collapse">
+            <thead>
+                <tr class="bg-[#94A378] text-white">
+                    <th class="p-4 text-right">اسم الطالبة</th>
+                    <th class="p-4">الحضور (10)</th>
+                    <th class="p-4">المراجعة (15)</th>
+                    <th class="p-4">الاختبار (25)</th>
+                    <th class="p-4">المجموع (50)</th>
+                    <th class="p-4 no-print">إجراء</th>
+                </tr>
+            </thead>
+            <tbody id="reportTable" class="divide-y divide-gray-100"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// عند تحميل الصفحة
+window.onload = function() {
+    const saved = localStorage.getItem('studentsData');
+    if (saved) {
+        const data = JSON.parse(saved);
+        data.forEach(s => addStudentRow(s.name, s.hodoor, s.morajaa, s.test));
+    }
+};
+
+function createScoreInput(max, value) {
+    return `<input type="number" value="${value}" min="0" max="${max}" step="0.25" 
+            class="w-24 text-center border rounded font-semibold py-1 score-input" 
+            oninput="validateInput(this, ${max}); updateTotal(this.closest('tr'))">`;
+}
+
+function addStudentRow(name = "", h=10, m=15, t=25) {
+    const row = document.createElement("tr");
+    row.className = "hover:bg-gray-50 transition";
+    row.innerHTML = `
+        <td class="p-2">
+            <input type="text" value="${name}" class="student-name border rounded px-2 py-1 w-full outline-none">
+        </td>
+        <td class="p-2">${createScoreInput(10, h)}</td>
+        <td class="p-2">${createScoreInput(15, m)}</td>
+        <td class="p-2">${createScoreInput(25, t)}</td>
+        <td class="p-2 font-bold text-[#2D3C59] total">0.00</td>
+        <td class="p-2 text-center no-print">
+            <button onclick="this.closest('tr').remove();" class="text-red-400 hover:text-red-600 text-xl">🗑️</button>
+        </td>
+    `;
+    document.getElementById("reportTable").appendChild(row);
+    updateTotal(row);
+}
+
+function validateInput(input, max) {
+    let val = parseFloat(input.value);
+    if (val > max) input.value = max;
+    if (val < 0 || isNaN(val)) input.value = 0;
+}
+
+function updateTotal(row) {
+    const inputs = row.querySelectorAll(".score-input");
+    let total = 0;
+    inputs.forEach(i => total += parseFloat(i.value || 0));
+    row.querySelector(".total").innerText = total.toFixed(2);
+}
+
+function addStudentsFromTextarea() {
+    const textarea = document.getElementById("namesInput");
+    const names = textarea.value.split("\n").map(n => n.trim()).filter(n => n !== "");
+    names.forEach(name => addStudentRow(name));
+    textarea.value = "";
+}
+
+function saveData() {
+    const rows = document.querySelectorAll("#reportTable tr");
+    const data = [];
+    rows.forEach(row => {
+        data.push({
+            name: row.querySelector(".student-name").value,
+            hodoor: row.querySelectorAll(".score-input")[0].value,
+            morajaa: row.querySelectorAll(".score-input")[1].value,
+            test: row.querySelectorAll(".score-input")[2].value
+        });
+    });
+    localStorage.setItem('studentsData', JSON.stringify(data));
+    alert("تم حفظ البيانات بنجاح ✅");
+}
+
+function clearAllData() {
+    if (confirm("هل تريدين حذف كافة الطالبات والبيانات؟ لا يمكن التراجع عن هذه الخطوة.")) {
+        document.getElementById("reportTable").innerHTML = "";
+        localStorage.removeItem('studentsData');
+    }
+}
+</script>
+
 </body>
 </html>
