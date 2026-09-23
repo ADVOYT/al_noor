@@ -70,7 +70,7 @@
             <a href="index.html" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-2xl font-bold text-sm transition flex items-center gap-1">
                 ⬅ الرئيسية
             </a>
-            <button onclick="copyShareableLink()" class="bg-[#94A378]/20 hover:bg-[#94A378]/30 text-[#4c5737] px-4 py-2 rounded-2xl font-bold text-xs md:text-sm transition flex items-center gap-2">
+            <button id="copyShareBtn" onclick="copyShareableLink()" class="bg-[#94A378]/20 hover:bg-[#94A378]/30 text-[#4c5737] px-4 py-2 rounded-2xl font-bold text-xs md:text-sm transition flex items-center gap-2">
                 🔗 نسخ رابط مشاركة النتائج للطالبات
             </button>
         </div>
@@ -101,7 +101,7 @@
 
         <h1 class="text-3xl md:text-5xl font-extrabold mb-3">🗺️ ميدان تحدي المناطق الـ 13</h1>
         <p class="max-w-2xl mx-auto text-gray-200 text-sm md:text-base leading-relaxed">
-            عرض تفصيلي لدرجات كل معيار (الحضور، السرد، الحفظ) بالإضافة إلى درجات مناطق الخريطة المستلمة!
+            عرض تفصيلي لدرجات كل معيار (الحضور، السرد، الحفظ) بالإضافة إلى درجات مناطق الخريطة المستلمة بشكل مستقل تماماً لكل فريق!
         </p>
 
         <!-- لوحة المعايير السريعة -->
@@ -335,7 +335,7 @@
 
     </div>
 
-    <!-- نافذة 1: فتح واستلام المنطقة مباشرة (بدون أسئلة) -->
+    <!-- نافذة 1: فتح واستلام المنطقة مباشرة -->
     <div id="regionActionModal" class="hidden fixed inset-0 bg-[#2D3C59]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white max-w-md w-full rounded-3xl p-6 md:p-8 shadow-2xl border border-gray-100 relative">
             <button onclick="closeModal('regionActionModal')" class="absolute top-5 left-5 text-gray-400 hover:text-gray-700 text-xl font-bold">✕</button>
@@ -443,7 +443,7 @@
     <!-- حاوية البالونات الصاعدة -->
     <div id="balloonsZone" class="pointer-events-none fixed inset-0 overflow-hidden z-[9998]"></div>
 
-    <!-- كود الجافاسكريبت المحدث بالتفصيل الكامل للتقييم -->
+    <!-- كود الجافاسكريبت الموحد -->
     <script>
         const ADMIN_PASS = "qwerty";
         let isTeacherUnlocked = false;
@@ -493,20 +493,41 @@
 
         function loadState() {
             const hash = window.location.hash;
-            if (hash && hash.startsWith('#state=')) {
+            
+            // 1. فحص النسق المضغوط الجديد فائق القصر (#d=)
+            if (hash && hash.startsWith('#d=')) {
                 try {
-                    const encodedData = hash.replace('#state=', '');
-                    const parsed = JSON.parse(decodeURIComponent(escape(atob(encodedData))));
-                    if (parsed && parsed.regions && parsed.teams) {
-                        state = parsed;
+                    const raw = decodeURIComponent(escape(atob(hash.replace('#d=', ''))));
+                    const c = JSON.parse(raw);
+                    if (c && c.t) {
+                        state.isStarted = c.s === 1;
+                        state.latestEvent = c.e || state.latestEvent;
+                        state.teams = c.t.map((arr, idx) => ({
+                            id: 1000 + idx,
+                            name: arr[0],
+                            members: arr[1] || [],
+                            attendanceScore: arr[2] || 0,
+                            sardScore: arr[3] || 0,
+                            hifzScore: arr[4] || 0,
+                            mapScore: arr[5] || 0,
+                            color: arr[6] || teamPalette[idx % teamPalette.length]
+                        }));
+                        state.regions = defaultRegions.map((reg, idx) => {
+                            const teamIdx = c.r ? c.r[idx] : -1;
+                            const capId = (teamIdx !== undefined && teamIdx !== -1 && state.teams[teamIdx]) 
+                                ? state.teams[teamIdx].id 
+                                : null;
+                            return { ...reg, capturedBy: capId };
+                        });
                         saveState();
                         return;
                     }
                 } catch (e) {
-                    console.warn("تعذر فك تشفير الرابط", e);
+                    console.warn("تعذر فك الرابط المضغوط", e);
                 }
             }
 
+            // 2. التحميل من التخزين المحلي
             const saved = localStorage.getItem('saudi_3d_competition_data');
             if (saved) {
                 try {
@@ -515,10 +536,10 @@
                     state.regions = parsed.regions || defaultRegions;
                     state.teams = (parsed.teams || []).map(t => ({
                         ...t,
-                        attendanceScore: t.attendanceScore || 0, // رصيد الحضور المستقل
-                        sardScore: t.sardScore || 0,             // رصيد السرد المستقل
-                        hifzScore: t.hifzScore || 0,             // رصيد الحفظ المستقل
-                        mapScore: t.mapScore || 0                // رصيد المناطق المستقل
+                        attendanceScore: t.attendanceScore || 0,
+                        sardScore: t.sardScore || 0,
+                        hifzScore: t.hifzScore || 0,
+                        mapScore: t.mapScore || 0
                     }));
                     state.latestEvent = parsed.latestEvent || state.latestEvent;
                 } catch (e) {
@@ -527,15 +548,65 @@
             }
         }
 
-        function copyShareableLink() {
-            const baseUri = window.location.origin + window.location.pathname;
-            const stateStr = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
-            const fullShareUrl = `${baseUri}#state=${stateStr}`;
+        // ================== نظام تقصير الرابط الفائق ==================
+        async function copyShareableLink() {
+            const btn = document.getElementById('copyShareBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = "⏳ جاري توليد الرابط المختصر...";
+            btn.disabled = true;
 
-            navigator.clipboard.writeText(fullShareUrl).then(() => {
-                alert("✅ تم نسخ رابط النتائج المباشرة بنجاح!\n\nأرسليه للطالبات؛ سيفتح لهن تفصيل التقييم ونتائج الخريطة في وضع المشاهدة المحمي دون إمكانية التعديل.");
+            // استخلاص البيانات الجوهرية فقط وتجريد كافة التكرارات
+            const compactData = {
+                s: state.isStarted ? 1 : 0,
+                e: state.latestEvent,
+                t: state.teams.map(t => [
+                    t.name,
+                    t.members,
+                    t.attendanceScore || 0,
+                    t.sardScore || 0,
+                    t.hifzScore || 0,
+                    t.mapScore || 0,
+                    t.color
+                ]),
+                r: state.regions.map(r => {
+                    if (r.capturedBy === null) return -1;
+                    return state.teams.findIndex(t => t.id === r.capturedBy);
+                })
+            };
+
+            const base64Str = btoa(unescape(encodeURIComponent(JSON.stringify(compactData))));
+            const baseUri = window.location.origin + window.location.pathname;
+            const fullCompactUrl = `${baseUri}#d=${base64Str}`;
+
+            let finalUrl = fullCompactUrl;
+
+            // محاولة اختصاره برابط فائق القصر (TinyURL) فورياً
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 2500); // مهلة ثانيتين ونصف كحد أقصى
+
+                const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(fullCompactUrl)}`, {
+                    signal: controller.signal
+                });
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const shortText = await response.text();
+                    if (shortText && shortText.startsWith("http")) {
+                        finalUrl = shortText.trim();
+                    }
+                }
+            } catch (err) {
+                // في حال غياب الإنترنت أو تعذر الخدمة نستخدم الرابط المضغوط الصغير فوراً
+            }
+
+            btn.innerHTML = originalText;
+            btn.disabled = false;
+
+            navigator.clipboard.writeText(finalUrl).then(() => {
+                alert(`✅ تم نسخ رابط الطالبات بنجاح!\n\nرابط مختصر وأنيق جاهز للمشاركة في الواتساب:\n${finalUrl}`);
             }).catch(() => {
-                prompt("انسخي رابط المشاركة من هنا:", fullShareUrl);
+                prompt("انسخي رابط المشاركة من هنا:", finalUrl);
             });
         }
 
@@ -720,7 +791,7 @@
             finalizeCompetition();
         }
 
-        // ================== اعتماد الاستلام المباشر للمنطقة ومنح النقاط ==================
+        // اعتماد الاستلام المباشر للمنطقة ومنح النقاط للمجموعة
         function confirmDirectAward() {
             const region = state.regions.find(r => r.id === currentActiveRegionId);
             const selectedTeamId = parseInt(document.getElementById('modalTeamSelect').value);
@@ -748,7 +819,7 @@
             triggerCelebration(winnerTeam.name, region.name, region.points);
         }
 
-        // ================== رصد درجات المعايير المفصولة لكل معيار على حدة ==================
+        // رصد درجات المعايير المفصولة لكل معيار على حدة (دون التأثير على أي فريق آخر)
         function adjustSpecificCriteria(teamId, type, delta, label) {
             if (!isTeacherUnlocked) {
                 alert("🔒 يجب فتح القفل الخاص بالمعلمة لتعديل درجات المعايير!");
@@ -961,7 +1032,6 @@
             renderTeams();
         }
 
-        // ================== لوحة الصدارة مع إبراز درجات التقييم بالتفصيل للطالبات ==================
         function renderTeams() {
             const container = document.getElementById('teamsListContainer');
             const countBadge = document.getElementById('teamsCountBadge');
@@ -997,7 +1067,6 @@
                 <div class="bg-gray-50 hover:bg-white p-4 rounded-2xl border border-gray-200 transition shadow-sm relative overflow-hidden">
                     <div class="w-2 absolute top-0 right-0 bottom-0" style="background-color: ${team.color}"></div>
                     
-                    <!-- الترويسة واسم المجموعة والمجموع النهائي -->
                     <div class="flex items-start justify-between gap-2 pr-2">
                         <div>
                             <div class="flex items-center gap-2">
@@ -1009,14 +1078,13 @@
                             </div>
                         </div>
                         
-                        <!-- إجمالي النقاط الكلي -->
                         <div class="text-left bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
                             <div class="text-xl font-black text-[#2D3C59]">${totalScore}</div>
                             <div class="text-[9px] text-gray-400 font-bold">المجموع الكلي</div>
                         </div>
                     </div>
 
-                    <!-- شبكة تفصيل درجات التقييم (ظاهرة للطالبات والجميع بالتفصيل) -->
+                    <!-- تفصيل الدرجات المنفصلة المعروضة للطالبات -->
                     <div class="mt-3 bg-white p-2.5 rounded-xl border border-gray-100">
                         <div class="text-[11px] font-bold text-gray-500 mb-2 flex items-center justify-between">
                             <span>📊 تفصيل درجات التقييم:</span>
@@ -1024,36 +1092,31 @@
                         </div>
                         
                         <div class="grid grid-cols-3 gap-1.5 text-center">
-                            <!-- الحضور الكامل -->
                             <div class="bg-blue-50/70 p-1.5 rounded-lg border border-blue-100">
                                 <div class="text-[10px] text-blue-700 font-bold">🕒 الحضور</div>
                                 <div class="text-sm font-black text-blue-900 mt-0.5">${attendance > 0 ? '+' : ''}${attendance}</div>
                             </div>
 
-                            <!-- السرد الكامل -->
                             <div class="bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-100">
                                 <div class="text-[10px] text-emerald-700 font-bold">📖 السرد</div>
                                 <div class="text-sm font-black text-emerald-900 mt-0.5">${sard > 0 ? '+' : ''}${sard}</div>
                             </div>
 
-                            <!-- الحفظ المتقن -->
                             <div class="bg-purple-50/70 p-1.5 rounded-lg border border-purple-100">
                                 <div class="text-[10px] text-purple-700 font-bold">🎯 الإتقان</div>
                                 <div class="text-sm font-black text-purple-900 mt-0.5">${hifz > 0 ? '+' : ''}${hifz}</div>
                             </div>
                         </div>
 
-                        <!-- نقاط مناطق الخريطة المستلمة -->
                         <div class="mt-2 bg-amber-50 p-2 rounded-lg border border-amber-100 flex items-center justify-between text-xs">
                             <span class="text-[11px] font-bold text-amber-900 flex items-center gap-1">
-                                <span>🗺️ نقاط المناطق:</span>
+                                <span>🗺️ درجات المناطق:</span>
                                 <span class="text-[10px] text-amber-700">(${capturedRegions.length} مناطق مستلمة)</span>
                             </span>
                             <span class="text-sm font-black text-amber-800">${mapScore} نقطة</span>
                         </div>
                     </div>
 
-                    <!-- شريط المناطق المستلمة -->
                     <div class="mt-2 text-xs bg-white p-2 rounded-xl border border-gray-100 flex flex-wrap gap-1 items-center">
                         <span class="text-gray-400 font-medium text-[11px]">المناطق:</span>
                         ${capturedRegions.length > 0 ? capturedRegions.map(r => `
