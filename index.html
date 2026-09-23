@@ -6,30 +6,136 @@
     <title>منصة حلقة النور ✨</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        /* نبض وتوهج إضافي لبطاقة المسابقة الجديدة */
+        .card-new-glow {
+            position: relative;
+        }
+        .card-new-glow::after {
+            content: '';
+            position: absolute;
+            inset: -3px;
+            border-radius: 2rem;
+            background: linear-gradient(135deg, #f59e0b, #ec4899, #3b82f6);
+            z-index: -1;
+            opacity: 0.25;
+            filter: blur(8px);
+            transition: opacity 0.3s ease;
+        }
+        .card-new-glow:hover::after {
+            opacity: 0.6;
+        }
+    </style>
 </head>
-<body class="bg-[#F5F7F4] min-h-screen font-['Tajawal'] text-[#2D3C59]">
+<body class="bg-[#F5F7F4] min-h-screen font-['Tajawal'] text-[#2D3C59] flex flex-col justify-between">
 
-    <header class="bg-[#2D3C59] text-white py-8 shadow-lg text-center mb-10">
-        <h1 class="text-4xl font-bold mb-2">✨ منصة حلقة النور النموذجية</h1>
-        <p class="opacity-90">بيئة تفاعلية لتحفيز طالبات القرآن</p>
-    </header>
+    <div>
+        <!-- ترويسة الموقع -->
+        <header class="bg-[#2D3C59] text-white py-10 shadow-lg text-center mb-12">
+            <h1 class="text-3xl md:text-5xl font-extrabold mb-3">✨ منصة حلقة النور النموذجية</h1>
+            <p class="opacity-90 text-base md:text-lg">بيئة تفاعلية لتحفيز طالبات القرآن والمنافسات الإثرائية</p>
+        </header>
 
-    <main class="container mx-auto px-4 max-w-4xl">
-        <div class="grid md:grid-cols-2 gap-8">
-            <a href="rep.html" class="group bg-white p-8 rounded-2xl shadow-md border-b-8 border-[#D1855C] hover:scale-105 transition-transform text-center">
-                <div class="text-6xl mb-4">📊</div>
-                <h2 class="text-2xl font-bold text-[#2D3C59]">تقرير الدرجات</h2>
-                <p class="text-gray-500 mt-2">متابعة الحضور، المراجعة، والنتائج النهائية</p>
-            </a>
+        <!-- المحتوى والبطاقات الثلاث -->
+        <main class="container mx-auto px-4 max-w-6xl mb-12">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-stretch">
+                
+                <!-- 1. بطاقة تقرير الدرجات (مقفلة برمز المرور qwerty) -->
+                <div onclick="accessReport(event)" 
+                     class="cursor-pointer group bg-white p-7 rounded-[2rem] shadow-md border-b-8 border-[#D1855C] hover:-translate-y-2 hover:shadow-xl transition-all text-center flex flex-col justify-between relative overflow-hidden">
+                    
+                    <!-- شارة القفل في الزاوية -->
+                    <div class="absolute top-4 left-4 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-3 py-1 rounded-full flex items-center gap-1 shadow-sm">
+                        <span>🔒</span>
+                        <span>مقفل للمشرفة</span>
+                    </div>
 
-            <a href="tree.html" class="group bg-white p-8 rounded-2xl shadow-md border-b-8 border-[#94A378] hover:scale-105 transition-transform text-center">
-                <div class="text-6xl mb-4">🌳</div>
-                <h2 class="text-2xl font-bold text-[#2D3C59]">شجرة الإنجاز</h2>
-                <p class="text-gray-500 mt-2">لوحة تحفيزية لعرض ثمار الطالبات الأسبوعية</p>
-            </a>
-        </div>
-    </main>
+                    <div class="pt-6">
+                        <div class="text-6xl mb-4 transform group-hover:scale-110 transition-transform">📊</div>
+                        <h2 class="text-2xl font-bold text-[#2D3C59] mb-2">تقرير الدرجات</h2>
+                        <p class="text-gray-500 text-sm leading-relaxed">متابعة الحضور، المراجعة، والاختبارات الشهرية</p>
+                    </div>
 
+                    <div class="mt-8">
+                        <span class="inline-flex items-center justify-center gap-2 w-full text-xs font-bold text-amber-800 bg-amber-100/70 hover:bg-amber-200 py-2.5 px-4 rounded-xl transition">
+                            <span>🔐 فتح بالرمز السري</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 2. بطاقة شجرة الإنجاز (مفتوحة ومتاحة للجميع) -->
+                <a href="tree.html" 
+                   class="group bg-white p-7 rounded-[2rem] shadow-md border-b-8 border-[#94A378] hover:-translate-y-2 hover:shadow-xl transition-all text-center flex flex-col justify-between">
+                    
+                    <div class="pt-6">
+                        <div class="text-6xl mb-4 transform group-hover:scale-110 transition-transform">🌳</div>
+                        <h2 class="text-2xl font-bold text-[#2D3C59] mb-2">شجرة الإنجاز</h2>
+                        <p class="text-gray-500 text-sm leading-relaxed">لوحة تحفيزية لعرض ثمار وبطولات الطالبات الأسبوعية</p>
+                    </div>
+
+                    <div class="mt-8">
+                        <span class="inline-flex items-center justify-center gap-2 w-full text-xs font-bold text-[#94A378] bg-[#94A378]/15 hover:bg-[#94A378]/25 py-2.5 px-4 rounded-xl transition">
+                            <span>عرض لوحة الثمار ⬅</span>
+                        </span>
+                    </div>
+                </a>
+
+                <!-- 3. بطاقة مسابقة خريطة المملكة (مع علامة NEW فائقة الوضوح) -->
+                <a href="map.html" 
+                   class="card-new-glow group bg-white p-7 rounded-[2rem] shadow-xl border-b-8 border-[#2D3C59] hover:-translate-y-2.5 hover:shadow-2xl transition-all text-center flex flex-col justify-between relative">
+                    
+                    <!-- علامة الـ NEW الواضحة والمتحركة بأعلى البطاقة -->
+                    <div class="absolute -top-4 left-1/2 -translate-x-1/2 z-20">
+                        <div class="animate-bounce bg-gradient-to-r from-amber-500 via-rose-500 to-amber-500 text-white font-black text-xs md:text-sm px-5 py-1.5 rounded-full shadow-lg border-2 border-white flex items-center gap-1.5 whitespace-nowrap">
+                            <span>🔥</span>
+                            <span>جديد • NEW</span>
+                            <span>🏆</span>
+                        </div>
+                    </div>
+
+                    <div class="pt-6">
+                        <div class="text-6xl mb-4 transform group-hover:scale-110 transition-transform">🗺️</div>
+                        <h2 class="text-2xl font-bold text-[#2D3C59] mb-2 flex items-center justify-center gap-1.5">
+                            <span>مسابقة خريطة المملكة</span>
+                        </h2>
+                        <p class="text-gray-500 text-sm leading-relaxed">تحدي المناطق الـ 13، نقاط سرية، وفرق متنافسة</p>
+                    </div>
+
+                    <div class="mt-8">
+                        <span class="inline-flex items-center justify-center gap-2 w-full text-xs font-extrabold text-white bg-[#2D3C59] hover:bg-slate-700 py-2.5 px-4 rounded-xl shadow transition">
+                            <span>دخول ميدان التحدي ⬅</span>
+                        </span>
+                    </div>
+                </a>
+
+            </div>
+        </main>
+    </div>
+
+    <footer class="text-center text-xs text-gray-400 pb-8">
+        منصة حلقة النور &copy; 2026 - بيئة إثرائية لتحفيز طالبات القرآن
+    </footer>
+
+    <!-- منطق فحص كلمة المرور لتقرير الدرجات -->
+    <script>
+        const ADMIN_PASSWORD = "qwerty";
+
+        function accessReport(event) {
+            if (event) event.preventDefault();
+            
+            // فتح نافذة إدخال كلمة المرور للمشرفة
+            const enteredPass = prompt("🔒 هذا القسم خاص بالمشرفة لرصد ومراجعة الدرجات.\n\nالرجاء إدخال كلمة المرور:");
+
+            if (enteredPass === ADMIN_PASSWORD) {
+                // الانتقال لصفحة التقرير في حال صحة الرمز
+                window.location.href = "rep.html";
+            } else if (enteredPass !== null) {
+                // تنبيه بالخطأ في حال تم إدخال رمز خاطئ
+                alert("❌ كلمة المرور غير صحيحة!\nلا يمكنكِ الوصول إلى تقرير الدرجات بدون تصريح.");
+            }
+            // في حال الضغط على إلغاء (Cancel)، لا يتم تنفيذ أي إجراء
+        }
+    </script>
 </body>
 </html>

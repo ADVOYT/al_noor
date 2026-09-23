@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🗺️ مسابقة خريطة المملكة 3D</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <style>
+        body {
+            font-family: 'Tajawal', sans-serif;
+            background-color: #F5F7F4;
+        }
+
+        .map-3d-wrapper {
+            filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.15));
+            transition: transform 0.4s ease;
+        }
+
+        .region-3d-polygon {
+            cursor: pointer;
+            transition: all 0.25s ease;
+            stroke-linejoin: round;
+        }
+        .region-3d-group:hover .region-3d-polygon {
+            filter: brightness(1.12) contrast(1.05);
+            stroke: #ffffff;
+            stroke-width: 3.5px;
+        }
+
+        .balloon {
+            position: fixed;
+            bottom: -100px;
+            font-size: 3.5rem;
+            user-select: none;
+            pointer-events: none;
+            z-index: 9999;
+            animation: floatUpward 4.5s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+        }
+
+        @keyframes floatUpward {
+            0% { transform: translateY(0) rotate(0deg) scale(0.6); opacity: 0; }
+            15% { opacity: 1; }
+            80% { opacity: 1; }
+            100% { transform: translateY(-120vh) rotate(35deg) scale(1.3); opacity: 0; }
+        }
+
+        .counter-btn {
+            width: 26px;
+            height: 26px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 9999px;
+            font-weight: 800;
+            font-size: 0.82rem;
+            transition: all 0.15s;
+        }
+        .counter-btn:active { transform: scale(0.85); }
+    </style>
+</head>
+<body class="text-[#2D3C59] min-h-screen p-3 md:p-8">
+
+    <!-- شريط الإشعارات العلوي وحالة القفل والمشاركة -->
+    <div class="max-w-7xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+        <div class="flex items-center gap-2">
+            <a href="index.html" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-2xl font-bold text-sm transition flex items-center gap-1">
+                ⬅ الرئيسية
+            </a>
+            <button onclick="copyShareableLink()" class="bg-[#94A378]/20 hover:bg-[#94A378]/30 text-[#4c5737] px-4 py-2 rounded-2xl font-bold text-xs md:text-sm transition flex items-center gap-2">
+                🔗 نسخ رابط مشاركة النتائج للطالبات
+            </button>
+        </div>
+
+        <div class="flex items-center gap-3">
+            <div id="modeStatusBadge" class="flex items-center gap-2 px-4 py-1.5 rounded-full text-xs md:text-sm font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                <span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span>
+                <span>🔒 وضع الزائر (المشاهدة فقط)</span>
+            </div>
+
+            <button id="authToggleBtn" onclick="toggleAdminAuth()" class="bg-[#2D3C59] hover:bg-slate-700 text-white px-5 py-2 rounded-2xl text-xs md:text-sm font-bold transition flex items-center gap-2 shadow-md">
+                🔓 فتح القفل الخاص بالمعلمة
+            </button>
+        </div>
+    </div>
+
+    <!-- ترويسة المسابقة -->
+    <div class="max-w-7xl mx-auto mb-8 text-center bg-gradient-to-r from-[#2D3C59] via-[#35486d] to-[#2D3C59] text-white p-6 md:p-10 rounded-[2.5rem] shadow-xl relative overflow-hidden">
+        
+        <div class="flex flex-wrap items-center justify-center gap-2 mb-3">
+            <span class="inline-block bg-[#94A378] text-white text-xs font-black px-4 py-1.5 rounded-full shadow">
+                مسابقة خريطة المملكة ثلاثية الأبعاد 3D 🇸🇦
+            </span>
+            <span id="contestStatusHeaderBadge" class="inline-block bg-amber-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow">
+                ⏳ بانتظار بدء المسابقة
+            </span>
+        </div>
+
+        <h1 class="text-3xl md:text-5xl font-extrabold mb-3">🗺️ ميدان تحدي المناطق الـ 13</h1>
+        <p class="max-w-2xl mx-auto text-gray-200 text-sm md:text-base leading-relaxed">
+            عرض تفصيلي لدرجات كل معيار (الحضور، السرد، الحفظ) بالإضافة إلى درجات مناطق الخريطة المستلمة!
+        </p>
+
+        <!-- لوحة المعايير السريعة -->
+        <div class="mt-6 flex flex-wrap justify-center gap-3 text-xs md:text-sm font-bold">
+            <div class="bg-white/10 backdrop-blur px-3.5 py-1.5 rounded-xl border border-white/10">🕒 الحضور الكامل: <span class="text-green-300">+3</span> / <span class="text-rose-300">-3</span></div>
+            <div class="bg-white/10 backdrop-blur px-3.5 py-1.5 rounded-xl border border-white/10">📖 السرد الكامل: <span class="text-green-300">+4</span> / <span class="text-rose-300">-4</span></div>
+            <div class="bg-white/10 backdrop-blur px-3.5 py-1.5 rounded-xl border border-white/10">🎯 الحفظ المتقن: <span class="text-green-300">+3</span> / <span class="text-rose-300">-3</span></div>
+            <div class="bg-[#D1855C] text-white px-3.5 py-1.5 rounded-xl shadow">💎 درجات المناطق: 1500 نقطة سرية مستقلة</div>
+        </div>
+    </div>
+
+    <!-- شبكة الصفحة -->
+    <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-8 mb-10">
+
+        <!-- قسم الخريطة 3D -->
+        <div class="lg:col-span-8 bg-white p-4 md:p-8 rounded-[2.5rem] shadow-xl border border-gray-100 flex flex-col items-center">
+            
+            <div class="w-full flex flex-wrap justify-between items-center mb-4 gap-2">
+                <div>
+                    <h2 class="text-2xl font-extrabold text-[#2D3C59] flex items-center gap-2">
+                        <span>خريطة المملكة المُجسّمة (3D)</span>
+                    </h2>
+                    <p id="mapSubNotice" class="text-xs text-gray-400 mt-1">النقاط محجوبة وسرية 🔒 اضغطي على أي منطقة للاستعلام أو اختيارها</p>
+                </div>
+
+                <!-- أزرار الإشراف -->
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button id="startCompetitionBtn" onclick="toggleStartCompetition()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-extrabold transition shadow flex items-center gap-1.5">
+                        <span>🚀 بدء المسابقة</span>
+                    </button>
+                    
+                    <button id="revealPointsBtn" onclick="openRevealPointsIfUnlocked()" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3.5 py-2 rounded-xl font-bold transition flex items-center gap-1">
+                        <span>🔒 كشف نقاط الخريطة</span>
+                    </button>
+
+                    <button id="finalPodiumBtn" onclick="finalizeCompetitionIfUnlocked()" class="text-xs bg-[#D1855C] hover:bg-[#b96f47] text-white px-3.5 py-2 rounded-xl font-bold transition shadow">
+                        🏆 إعلان الختام
+                    </button>
+                </div>
+            </div>
+
+            <!-- حاوية خريطة SVG ثلاثية الأبعاد -->
+            <div class="relative w-full bg-gradient-to-b from-[#f8fafc] to-[#eef2f6] rounded-3xl p-2 md:p-6 border border-gray-200 flex items-center justify-center overflow-hidden">
+                
+                <svg id="saudi3dMap" viewBox="0 0 1020 980" class="w-full h-auto max-h-[720px] select-none map-3d-wrapper" xmlns="http://www.w3.org/2000/svg">
+                    <defs>
+                        <filter id="textGlow" x="-20%" y="-20%" width="140%" height="140%">
+                            <feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#000000" flood-opacity="0.85"/>
+                        </filter>
+                        <linearGradient id="extrusionGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stop-color="#555E67"/>
+                            <stop offset="100%" stop-color="#32383E"/>
+                        </linearGradient>
+                    </defs>
+
+                    <!-- ظل المجسم السفلي -->
+                    <path d="M 70,360 L 170,510 L 220,555 L 260,650 L 330,795 L 365,850 L 400,920 L 435,890 L 610,870 L 965,750 L 980,630 L 910,640 L 590,830 L 420,865 L 380,885 L 345,820 L 245,630 L 150,480 Z" 
+                          fill="rgba(0, 0, 0, 0.16)" filter="blur(10px)"/>
+
+                    <!-- سماكة التجسيم الـ 3D الجانبي -->
+                    <path id="extrusionWall" d="
+                        M 60,325 L 125,390 L 140,410 L 170,470 L 210,525 L 245,620 L 290,710 L 325,765 L 350,815 L 380,850 L 405,890 L 425,855 
+                        L 590,835 L 720,790 L 945,715 L 945,735 L 720,810 L 590,855 L 425,875 L 405,910 L 380,870 L 350,835 L 325,785 L 290,730 
+                        L 245,640 L 210,545 L 170,490 L 140,430 L 125,410 L 80,365 L 60,345 Z" 
+                          fill="url(#extrusionGrad)" stroke="#2D3339" stroke-width="1.5"/>
+
+                    <!-- تبوك -->
+                    <g onclick="handleRegionClick('tabuk')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-tabuk" class="region-3d-polygon" points="60,325 155,185 240,230 250,335 285,410 195,505 170,470 140,410 125,390" fill="#E6BF00" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="165" y="360" font-size="21" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">تبوك</text>
+                        <text id="badge-tabuk" x="165" y="385" font-size="12" font-weight="800" fill="#FFF3A8" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- الجوف -->
+                    <g onclick="handleRegionClick('jouf')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-jouf" class="region-3d-polygon" points="155,185 195,145 355,235 315,335 240,230" fill="#3B873E" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="245" y="240" font-size="22" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">الجوف</text>
+                        <text id="badge-jouf" x="245" y="265" font-size="12" font-weight="800" fill="#E2FADF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- المنطقة الشمالية -->
+                    <g onclick="handleRegionClick('northern')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-northern" class="region-3d-polygon" points="195,145 330,175 480,290 455,365 355,235" fill="#325758" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="375" y="245" font-size="21" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">المنطقة الشمالية</text>
+                        <text id="badge-northern" x="375" y="270" font-size="12" font-weight="800" fill="#D3F4F5" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- حائل -->
+                    <g onclick="handleRegionClick('hail')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-hail" class="region-3d-polygon" points="240,230 315,335 355,235 455,365 485,360 460,395 365,475 285,410 250,335" fill="#087F3B" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="350" y="375" font-size="21" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">حائل</text>
+                        <text id="badge-hail" x="350" y="400" font-size="12" font-weight="800" fill="#CBF9DA" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- القصيم -->
+                    <g onclick="handleRegionClick('qassim')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-qassim" class="region-3d-polygon" points="460,395 485,360 540,430 480,500 410,500 365,475" fill="#8CBF37" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="445" y="445" font-size="20" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">القصيم</text>
+                        <text id="badge-qassim" x="445" y="470" font-size="12" font-weight="800" fill="#F0FCDA" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- المدينة المنورة -->
+                    <g onclick="handleRegionClick('madinah')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-madinah" class="region-3d-polygon" points="195,505 285,410 365,475 355,570 280,605 210,525 170,470" fill="#687D56" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="265" y="525" font-size="20" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">المدينة المنورة</text>
+                        <text id="badge-madinah" x="265" y="550" font-size="12" font-weight="800" fill="#F1FBE9" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- الرياض -->
+                    <g onclick="handleRegionClick('riyadh')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-riyadh" class="region-3d-polygon" points="410,500 480,500 540,430 600,435 635,530 615,730 490,750 435,675 355,570" fill="#C5A506" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="525" y="575" font-size="24" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">الرياض</text>
+                        <text id="badge-riyadh" x="525" y="605" font-size="13" font-weight="800" fill="#FFF8C9" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- المنطقة الشرقية -->
+                    <g onclick="handleRegionClick('eastern')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-eastern" class="region-3d-polygon" points="480,290 535,320 610,320 660,390 710,435 745,510 820,590 945,615 945,715 720,790 600,770 615,730 635,530 600,435 540,430 485,360" fill="#4CAE4F" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="660" y="440" font-size="14" font-weight="800" fill="#FFFFFF" text-anchor="middle" opacity="0.8" filter="url(#textGlow)" pointer-events="none">الجبيل</text>
+                        <text x="700" y="495" font-size="14" font-weight="800" fill="#FFFFFF" text-anchor="middle" opacity="0.8" filter="url(#textGlow)" pointer-events="none">الدمام • الخبر</text>
+                        <text x="750" y="660" font-size="22" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">المنطقة الشرقية</text>
+                        <text id="badge-eastern" x="750" y="688" font-size="13" font-weight="800" fill="#DCFFDF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- مكة المكرمة -->
+                    <g onclick="handleRegionClick('makkah')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-makkah" class="region-3d-polygon" points="280,605 355,570 435,675 375,705 330,685 340,740 325,765 290,710 245,620 210,525" fill="#008B7D" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="335" y="635" font-size="20" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">مكة المكرّمة</text>
+                        <text x="268" y="670" font-size="14" font-weight="800" fill="#FFFFFF" text-anchor="middle" opacity="0.85" filter="url(#textGlow)" pointer-events="none">جدّة</text>
+                        <text id="badge-makkah" x="335" y="660" font-size="12" font-weight="800" fill="#C2FFF8" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- الباحة -->
+                    <g onclick="handleRegionClick('baha')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-baha" class="region-3d-polygon" points="330,685 370,690 365,735 340,740" fill="#A7D7C5" stroke="#2D3C59" stroke-width="1.8"/>
+                        <text x="348" y="718" font-size="14" font-weight="900" fill="#1C382F" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">الباحة</text>
+                        <text id="badge-baha" x="348" y="734" font-size="11" font-weight="800" fill="#1C382F" text-anchor="middle" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- عسير -->
+                    <g onclick="handleRegionClick('asir')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-asir" class="region-3d-polygon" points="435,675 470,725 435,825 365,785 365,735 370,690 375,705" fill="#00A355" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="410" y="760" font-size="20" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">عسير</text>
+                        <text id="badge-asir" x="410" y="785" font-size="12" font-weight="800" fill="#DAFFED" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- جازان -->
+                    <g onclick="handleRegionClick('jazan')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-jazan" class="region-3d-polygon" points="325,765 365,785 405,890 380,850 350,815" fill="#BA8F3C" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="390" y="855" font-size="15" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">جيزان</text>
+                        <text id="badge-jazan" x="390" y="873" font-size="11" font-weight="800" fill="#FFF1CE" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                    <!-- نجران -->
+                    <g onclick="handleRegionClick('najran')" class="region-3d-group cursor-pointer">
+                        <polygon id="poly-najran" class="region-3d-polygon" points="435,825 470,725 490,750 615,730 600,770 720,790 590,835 425,855 405,890" fill="#075936" stroke="#2D3C59" stroke-width="2"/>
+                        <text x="535" y="805" font-size="21" font-weight="900" fill="#FFFFFF" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">نجران</text>
+                        <text id="badge-najran" x="535" y="830" font-size="12" font-weight="800" fill="#C2FFDE" text-anchor="middle" filter="url(#textGlow)" pointer-events="none">🔒 سرية</text>
+                    </g>
+
+                </svg>
+
+            </div>
+
+            <!-- بطاقة آخر حدث والإحصائيات -->
+            <div class="w-full mt-6 flex flex-col md:flex-row justify-between items-center gap-4 bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">📢</span>
+                    <div>
+                        <div class="text-xs text-gray-400 font-bold">آخر حدث تم تسجيله:</div>
+                        <div id="latestEventText" class="text-sm font-bold text-[#2D3C59]">لم يتم استلام أي منطقة بعد.</div>
+                    </div>
+                </div>
+                <div id="regionsCapturedCount" class="text-xs font-bold text-[#94A378] bg-white px-4 py-2 rounded-xl shadow-sm border border-gray-100">
+                    المناطق المستلمة: 0 / 13
+                </div>
+            </div>
+        </div>
+
+        <!-- قسم إدارة المجموعات ولوحة الصدارة المفصلة -->
+        <div class="lg:col-span-4 flex flex-col gap-6">
+
+            <!-- إضافة مجموعة -->
+            <div id="addTeamCard" class="bg-white p-6 rounded-[2.5rem] shadow-xl border border-gray-100 relative">
+                
+                <div id="addTeamLockOverlay" class="absolute inset-0 bg-white/80 backdrop-blur-[2px] rounded-[2.5rem] z-20 flex flex-col items-center justify-center p-6 text-center">
+                    <span class="text-4xl mb-2">🔒</span>
+                    <h4 class="font-extrabold text-[#2D3C59] text-base mb-1">إضافة المجموعات مقفلة</h4>
+                    <p class="text-xs text-gray-500 mb-3">يتطلب صلاحية المعلمة للتسجيل والتعديل</p>
+                    <button onclick="toggleAdminAuth()" class="bg-[#2D3C59] text-white text-xs font-bold px-4 py-2 rounded-xl shadow">
+                        🔓 فتح القفل الخاص بالمعلمة
+                    </button>
+                </div>
+
+                <h3 class="text-xl font-extrabold text-[#2D3C59] mb-3 flex items-center justify-between">
+                    <span>👥 إضافة مجموعة جديدة</span>
+                    <span class="text-xs font-normal text-gray-400">(شرط إدخال فريقين)</span>
+                </h3>
+                
+                <div class="space-y-3">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">اسم المجموعة:</label>
+                        <input type="text" id="newTeamName" placeholder="مثال: مجموعة الفردوس، الكوثر..." 
+                               class="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-right outline-none focus:ring-2 focus:ring-[#94A378]">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-600 mb-1">أسماء العضوات (فواصل أو أسطر):</label>
+                        <textarea id="newTeamMembers" rows="2" placeholder="سارة، فاطمة، مريم..." 
+                                  class="w-full bg-gray-50 border border-gray-200 rounded-xl p-3 text-sm text-right outline-none focus:ring-2 focus:ring-[#94A378]"></textarea>
+                    </div>
+                    <button onclick="addNewTeam()" class="w-full bg-[#94A378] hover:bg-[#7d8c63] text-white py-2.5 rounded-xl font-bold text-sm shadow transition flex items-center justify-center gap-2">
+                        ➕ تسجيل المجموعة
+                    </button>
+                </div>
+            </div>
+
+            <!-- لوحة الصدارة المفصلة -->
+            <div class="bg-white p-6 rounded-[2.5rem] shadow-xl border border-gray-100 flex-1 flex flex-col">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold text-[#2D3C59] flex items-center gap-2">
+                        <span>🏆 لوحة الصدارة</span>
+                        <span id="teamsCountBadge" class="text-xs bg-[#94A378] text-white px-2.5 py-0.5 rounded-full font-bold">0</span>
+                    </h3>
+                    <span class="text-xs text-gray-400">تفصيل كامل للدرجات والمعايير</span>
+                </div>
+
+                <div id="teamsListContainer" class="space-y-4 overflow-y-auto max-h-[580px] pr-1"></div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- نافذة 1: فتح واستلام المنطقة مباشرة (بدون أسئلة) -->
+    <div id="regionActionModal" class="hidden fixed inset-0 bg-[#2D3C59]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white max-w-md w-full rounded-3xl p-6 md:p-8 shadow-2xl border border-gray-100 relative">
+            <button onclick="closeModal('regionActionModal')" class="absolute top-5 left-5 text-gray-400 hover:text-gray-700 text-xl font-bold">✕</button>
+            
+            <div class="text-center mb-6">
+                <span class="text-5xl inline-block mb-2">📍</span>
+                <h3 id="modalRegionTitle" class="text-2xl font-extrabold text-[#2D3C59]">منطقة الرياض</h3>
+                <p class="text-xs text-gray-400 mt-1">النقاط سرية وستُمنح مباشرة للمجموعة المختارة 🎁</p>
+            </div>
+
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-2">المجموعة المستحقة لاستلام المنطقة:</label>
+                    <select id="modalTeamSelect" class="w-full bg-gray-50 border border-gray-300 rounded-xl p-3 text-sm font-bold text-[#2D3C59] outline-none focus:ring-2 focus:ring-[#94A378]">
+                    </select>
+                </div>
+
+                <div class="pt-2">
+                    <button type="button" onclick="confirmDirectAward()" class="w-full bg-[#94A378] hover:bg-[#7e8e63] text-white py-3.5 px-4 rounded-xl font-extrabold text-sm shadow-lg transition flex items-center justify-center gap-2">
+                        <span>🎉 فتح المنطقة ومنح النقاط مباشرة</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة 2: استعلام الزائر -->
+    <div id="visitorInfoModal" class="hidden fixed inset-0 bg-[#2D3C59]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white max-w-md w-full rounded-3xl p-6 md:p-8 shadow-2xl border border-gray-100 text-center relative">
+            <button onclick="closeModal('visitorInfoModal')" class="absolute top-5 left-5 text-gray-400 hover:text-gray-700 text-xl font-bold">✕</button>
+            <div id="visitorModalIcon" class="text-5xl mb-3">📍</div>
+            <h3 id="visitorModalTitle" class="text-2xl font-extrabold text-[#2D3C59] mb-2">منطقة مكة المكرمة</h3>
+            <div id="visitorModalContent" class="text-sm text-gray-600 leading-relaxed mb-6"></div>
+            <button onclick="closeModal('visitorInfoModal')" class="bg-[#2D3C59] text-white px-6 py-2 rounded-full font-bold text-sm">
+                حسناً فهمت
+            </button>
+        </div>
+    </div>
+
+    <!-- نافذة 3: كشف نقاط الخريطة (محمي) -->
+    <div id="revealPointsModal" class="hidden fixed inset-0 bg-[#2D3C59]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white max-w-xl w-full rounded-3xl p-6 md:p-8 shadow-2xl border border-gray-100 relative max-h-[90vh] flex flex-col">
+            <button onclick="closeModal('revealPointsModal')" class="absolute top-5 left-5 text-gray-400 hover:text-gray-700 text-xl font-bold">✕</button>
+            <div class="text-center mb-4">
+                <h3 class="text-2xl font-extrabold text-[#2D3C59]">🔍 كشف وتدقيق نقاط المناطق الـ 13</h3>
+                <p class="text-xs text-gray-400">خاص بالمعلمة للتحقق من أن مجموع نقاط الخريطة يساوي 1500 نقطة بالضبط</p>
+            </div>
+            <div class="overflow-y-auto flex-1 mb-4">
+                <table class="w-full text-sm text-right border-collapse">
+                    <thead>
+                        <tr class="bg-gray-50 text-gray-600 border-b">
+                            <th class="p-2.5">المنطقة الإدارية</th>
+                            <th class="p-2.5 text-center">النقاط السرية</th>
+                            <th class="p-2.5 text-center">حالة الاستلام</th>
+                        </tr>
+                    </thead>
+                    <tbody id="revealTableBody" class="divide-y divide-gray-100"></tbody>
+                </table>
+            </div>
+            <div class="bg-green-50 p-3 rounded-xl border border-green-200 flex justify-between items-center text-sm font-bold text-green-900">
+                <span>المجموع الكلي لنقاط الخريطة:</span>
+                <span id="revealTotalPointsSum" class="text-base text-green-700">1500 نقطة ✅</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- نافذة 4: التتويج والختام النهائي -->
+    <div id="finalPodiumModal" class="hidden fixed inset-0 bg-[#2D3C59]/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+        <div class="bg-white max-w-2xl w-full rounded-[3rem] p-6 md:p-10 shadow-2xl border border-gray-100 text-center relative overflow-hidden">
+            <button onclick="closeModal('finalPodiumModal')" class="absolute top-6 left-6 text-gray-400 hover:text-gray-700 text-xl font-bold">✕</button>
+            <span class="text-6xl inline-block mb-3 animate-bounce">👑</span>
+            <h2 class="text-3xl font-extrabold text-[#2D3C59] mb-1">النتائج الختامية لمسابقة الخريطة</h2>
+            <p class="text-sm text-gray-500 mb-6">مبارك لجميع المجموعات المشاركة هذا الإنجاز المبارك 🌟</p>
+            
+            <div id="podiumCardsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end"></div>
+
+            <button onclick="closeModal('finalPodiumModal')" class="bg-[#94A378] text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-opacity-90 transition">
+                إغلاق واحتفال 🎉
+            </button>
+        </div>
+    </div>
+
+    <!-- نافذة 5: تعديل المجموعة -->
+    <div id="editTeamModal" class="hidden fixed inset-0 bg-[#2D3C59]/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white max-w-md w-full rounded-3xl p-6 md:p-8 shadow-2xl border border-gray-100 relative">
+            <button onclick="closeModal('editTeamModal')" class="absolute top-5 left-5 text-gray-400 hover:text-gray-700 text-xl font-bold">✕</button>
+            <h3 class="text-xl font-bold text-[#2D3C59] mb-4">✏️ تعديل بيانات المجموعة</h3>
+            <input type="hidden" id="editTeamId">
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">اسم المجموعة:</label>
+                    <input type="text" id="editTeamNameInput" class="w-full bg-gray-50 border rounded-xl px-4 py-2 text-sm outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-gray-600 mb-1">أسماء الأعضاء:</label>
+                    <textarea id="editTeamMembersInput" rows="3" class="w-full bg-gray-50 border rounded-xl p-3 text-sm outline-none"></textarea>
+                </div>
+                <button onclick="saveTeamEdits()" class="w-full bg-[#2D3C59] text-white py-2.5 rounded-xl font-bold text-sm shadow">
+                    حفظ التعديلات ✅
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- حاوية البالونات الصاعدة -->
+    <div id="balloonsZone" class="pointer-events-none fixed inset-0 overflow-hidden z-[9998]"></div>
+
+    <!-- كود الجافاسكريبت المحدث بالتفصيل الكامل للتقييم -->
+    <script>
+        const ADMIN_PASS = "qwerty";
+        let isTeacherUnlocked = false;
+
+        const defaultRegions = [
+            { id: 'riyadh', name: 'منطقة الرياض', points: 180, defaultColor: '#C5A506', capturedBy: null },
+            { id: 'makkah', name: 'منطقة مكة المكرمة', points: 170, defaultColor: '#008B7D', capturedBy: null },
+            { id: 'eastern', name: 'المنطقة الشرقية', points: 160, defaultColor: '#4CAE4F', capturedBy: null },
+            { id: 'madinah', name: 'منطقة المدينة المنورة', points: 140, defaultColor: '#687D56', capturedBy: null },
+            { id: 'asir', name: 'منطقة عسير', points: 130, defaultColor: '#00A355', capturedBy: null },
+            { id: 'qassim', name: 'منطقة القصيم', points: 120, defaultColor: '#8CBF37', capturedBy: null },
+            { id: 'tabuk', name: 'منطقة تبوك', points: 110, defaultColor: '#E6BF00', capturedBy: null },
+            { id: 'hail', name: 'منطقة حائل', points: 100, defaultColor: '#087F3B', capturedBy: null },
+            { id: 'jouf', name: 'منطقة الجوف', points: 100, defaultColor: '#3B873E', capturedBy: null },
+            { id: 'northern', name: 'المنطقة الشمالية', points: 100, defaultColor: '#325758', capturedBy: null },
+            { id: 'jazan', name: 'منطقة جازان', points: 100, defaultColor: '#BA8F3C', capturedBy: null },
+            { id: 'najran', name: 'منطقة نجران', points: 100, defaultColor: '#075936', capturedBy: null },
+            { id: 'baha', name: 'منطقة الباحة', points: 90, defaultColor: '#A7D7C5', capturedBy: null }
+        ];
+
+        const teamPalette = [
+            '#94A378', '#D1855C', '#2D3C59', '#6366F1', '#EC4899', 
+            '#059669', '#D97706', '#0284C7', '#8B5CF6', '#DC2626'
+        ];
+
+        let state = {
+            isStarted: false,
+            regions: defaultRegions,
+            teams: [],
+            latestEvent: "المسابقة بانتظار إعلان البدء من قِبل المعلمة."
+        };
+
+        let currentActiveRegionId = null;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadState();
+            applyLockUI();
+            renderMap();
+            renderTeams();
+            updateCompetitionStatusDisplay();
+            checkAndPlayLatestCelebrationOnLoad();
+        });
+
+        function saveState() {
+            localStorage.setItem('saudi_3d_competition_data', JSON.stringify(state));
+        }
+
+        function loadState() {
+            const hash = window.location.hash;
+            if (hash && hash.startsWith('#state=')) {
+                try {
+                    const encodedData = hash.replace('#state=', '');
+                    const parsed = JSON.parse(decodeURIComponent(escape(atob(encodedData))));
+                    if (parsed && parsed.regions && parsed.teams) {
+                        state = parsed;
+                        saveState();
+                        return;
+                    }
+                } catch (e) {
+                    console.warn("تعذر فك تشفير الرابط", e);
+                }
+            }
+
+            const saved = localStorage.getItem('saudi_3d_competition_data');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    state.isStarted = parsed.isStarted || false;
+                    state.regions = parsed.regions || defaultRegions;
+                    state.teams = (parsed.teams || []).map(t => ({
+                        ...t,
+                        attendanceScore: t.attendanceScore || 0, // رصيد الحضور المستقل
+                        sardScore: t.sardScore || 0,             // رصيد السرد المستقل
+                        hifzScore: t.hifzScore || 0,             // رصيد الحفظ المستقل
+                        mapScore: t.mapScore || 0                // رصيد المناطق المستقل
+                    }));
+                    state.latestEvent = parsed.latestEvent || state.latestEvent;
+                } catch (e) {
+                    console.error("خطأ في قراءة البيانات", e);
+                }
+            }
+        }
+
+        function copyShareableLink() {
+            const baseUri = window.location.origin + window.location.pathname;
+            const stateStr = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+            const fullShareUrl = `${baseUri}#state=${stateStr}`;
+
+            navigator.clipboard.writeText(fullShareUrl).then(() => {
+                alert("✅ تم نسخ رابط النتائج المباشرة بنجاح!\n\nأرسليه للطالبات؛ سيفتح لهن تفصيل التقييم ونتائج الخريطة في وضع المشاهدة المحمي دون إمكانية التعديل.");
+            }).catch(() => {
+                prompt("انسخي رابط المشاركة من هنا:", fullShareUrl);
+            });
+        }
+
+        function toggleAdminAuth() {
+            if (isTeacherUnlocked) {
+                isTeacherUnlocked = false;
+                applyLockUI();
+                alert("🔒 تم قفل لوحة التحكم والعودة لوضع الزائر (المشاهدة فقط).");
+            } else {
+                const pass = prompt("🔐 أدخلي كلمة المرور لفتح لوحة تحكم المعلمة:");
+                if (pass === ADMIN_PASS) {
+                    isTeacherUnlocked = true;
+                    applyLockUI();
+                    alert("✅ مرحباً بكِ يا معلمة! تم فتح الصلاحيات كاملة.");
+                } else if (pass !== null) {
+                    alert("❌ كلمة المرور غير صحيحة!");
+                }
+            }
+        }
+
+        function applyLockUI() {
+            const badge = document.getElementById('modeStatusBadge');
+            const authBtn = document.getElementById('authToggleBtn');
+            const lockOverlay = document.getElementById('addTeamLockOverlay');
+            const revealBtn = document.getElementById('revealPointsBtn');
+
+            if (isTeacherUnlocked) {
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span><span>لوحة المعلمة مفتوحة ✅</span>`;
+                badge.className = "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs md:text-sm font-bold bg-emerald-50 text-emerald-800 border border-emerald-200";
+                authBtn.innerHTML = "🔒 قفل لوحة المعلمة";
+                authBtn.className = "bg-rose-600 hover:bg-rose-700 text-white px-5 py-2 rounded-2xl text-xs md:text-sm font-bold transition flex items-center gap-2 shadow";
+                
+                if (lockOverlay) lockOverlay.classList.add('hidden');
+                if (revealBtn) revealBtn.innerHTML = "👁️ كشف نقاط الخريطة";
+            } else {
+                badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span><span>🔒 وضع الزائر (المشاهدة فقط)</span>`;
+                badge.className = "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs md:text-sm font-bold bg-amber-50 text-amber-800 border border-amber-200";
+                authBtn.innerHTML = "🔓 فتح القفل الخاص بالمعلمة";
+                authBtn.className = "bg-[#2D3C59] hover:bg-slate-700 text-white px-5 py-2 rounded-2xl text-xs md:text-sm font-bold transition flex items-center gap-2 shadow-md";
+                
+                if (lockOverlay) lockOverlay.classList.remove('hidden');
+                if (revealBtn) revealBtn.innerHTML = "🔒 كشف النقاط (مقفل)";
+            }
+
+            renderTeams();
+        }
+
+        function toggleStartCompetition() {
+            if (!isTeacherUnlocked) {
+                alert("🔒 عذراً، يجب فتح القفل الخاص بالمعلمة أولاً!");
+                toggleAdminAuth();
+                return;
+            }
+
+            if (!state.teams || state.teams.length < 2) {
+                alert("⚠️ لا يمكن بدء المسابقة قبل تسجيل فريقين على الأقل وأسماء عضواتهما!");
+                return;
+            }
+
+            state.isStarted = !state.isStarted;
+
+            if (state.isStarted) {
+                state.latestEvent = "🔥 انطلقت المسابقة رسمياً! الخريطة مفتوحة الآن لتحديد المجموعات واستلام المناطق.";
+                if (window.confetti) confetti({ particleCount: 70, spread: 80 });
+            } else {
+                state.latestEvent = "تم إيقاف المسابقة مؤقتاً بواسطة المعلمة.";
+            }
+
+            saveState();
+            updateCompetitionStatusDisplay();
+            renderMap();
+        }
+
+        function updateCompetitionStatusDisplay() {
+            const headerBadge = document.getElementById('contestStatusHeaderBadge');
+            const startBtn = document.getElementById('startCompetitionBtn');
+            const subNotice = document.getElementById('mapSubNotice');
+            const latestEvent = document.getElementById('latestEventText');
+
+            if (state.isStarted) {
+                headerBadge.innerText = "🔥 المسابقة جارية والتنافس مشتعل";
+                headerBadge.className = "inline-block bg-emerald-600 text-white text-xs font-black px-4 py-1.5 rounded-full shadow animate-pulse";
+                startBtn.innerHTML = "⏸️ إيقاف المسابقة مؤقتاً";
+                startBtn.className = "text-xs bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-extrabold transition shadow";
+                subNotice.innerText = "المسابقة جارية! اضغطي على أي منطقة لمعرفة إن كانت متاحة أو تم استلامها";
+            } else {
+                headerBadge.innerText = "⏳ بانتظار بدء المسابقة";
+                headerBadge.className = "inline-block bg-amber-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow";
+                startBtn.innerHTML = "🚀 بدء المسابقة";
+                startBtn.className = "text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-extrabold transition shadow";
+                subNotice.innerText = "المسابقة لم تبدأ بعد، بانتظار إشارة الانطلاق من المعلمة ⏳";
+            }
+
+            latestEvent.innerText = state.latestEvent;
+        }
+
+        function handleRegionClick(regionId) {
+            const region = state.regions.find(r => r.id === regionId);
+            if (!region) return;
+
+            if (!isTeacherUnlocked) {
+                openVisitorModal(region);
+                return;
+            }
+
+            if (!state.isStarted) {
+                const startNow = confirm(`⚠️ المسابقة لم تبدأ بعد!\nهل ترغبين في بدء المسابقة الآن واختيار (${region.name})؟`);
+                if (startNow) toggleStartCompetition();
+                else return;
+            }
+
+            if (!state.teams || state.teams.length < 2) {
+                alert("⚠️ تنبيه: يجب إضافة فريقين على الأقل أولاً وأسماء عضواتهما!");
+                return;
+            }
+
+            currentActiveRegionId = regionId;
+            document.getElementById('modalRegionTitle').innerText = region.name;
+            
+            const select = document.getElementById('modalTeamSelect');
+            select.innerHTML = state.teams.map(t => {
+                const total = (t.attendanceScore || 0) + (t.sardScore || 0) + (t.hifzScore || 0) + (t.mapScore || 0);
+                return `<option value="${t.id}">${t.name} (المجموع الكلي: ${total} نقطة | المناطق: ${t.mapScore || 0})</option>`;
+            }).join('');
+
+            openModal('regionActionModal');
+        }
+
+        function openVisitorModal(region) {
+            const title = document.getElementById('visitorModalTitle');
+            const content = document.getElementById('visitorModalContent');
+            const icon = document.getElementById('visitorModalIcon');
+
+            title.innerText = region.name;
+
+            if (region.capturedBy) {
+                const team = state.teams.find(t => t.id === region.capturedBy);
+                icon.innerText = "🏆";
+                content.innerHTML = `
+                    <div class="bg-emerald-50 p-4 rounded-2xl border border-emerald-200 text-emerald-900 mb-3">
+                        <div class="text-xs font-bold text-gray-500">حالة المنطقة:</div>
+                        <div class="text-lg font-black mt-1 text-[#2D3C59]">تم استلام المنطقة من قبل مجموعة:</div>
+                        <div class="text-2xl font-black text-emerald-700 mt-1">${team ? team.name : 'فريق متصدر'} ⭐</div>
+                        <div class="text-xs text-gray-500 mt-2 font-medium">العضوات: ${team && team.members.length ? team.members.join('، ') : 'نخبة متميزة'}</div>
+                    </div>
+                    <div class="font-bold text-[#D1855C] text-sm">
+                        ⭐ أُضيفت نقاط هذه المنطقة لرصيد درجات مناطق المجموعة!
+                    </div>
+                `;
+            } else {
+                icon.innerText = state.isStarted ? "🎯" : "🔒";
+                content.innerHTML = `
+                    <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200 text-gray-700">
+                        <div class="text-base font-extrabold text-[#2D3C59] mb-2">
+                            ${state.isStarted ? 'المنطقة لم تُستملك بعد!' : 'بانتظار انطلاق المسابقة!'}
+                        </div>
+                        <p class="text-sm text-emerald-800 font-bold leading-relaxed">
+                            ${state.isStarted ? '✨ هذه المنطقة متاحة الآن، يمكن اختيارها في الجولة القادمة!' : '⏳ ستبدأ المنافسة على هذه المنطقة فور إعطاء المعلمة إشارة البدء.'}
+                        </p>
+                        <p class="text-xs text-gray-400 mt-2">النقاط سرية ومحجوبة 🔒 وتُمنح للمجموعة الفائزة فور اختيارها.</p>
+                    </div>
+                `;
+            }
+            openModal('visitorInfoModal');
+        }
+
+        function openRevealPointsIfUnlocked() {
+            if (!isTeacherUnlocked) {
+                alert("🔒 ميزة كشف نقاط الخريطة مخصصة للمعلمة فقط للتحقق!");
+                toggleAdminAuth();
+                return;
+            }
+            revealAllPointsModal();
+        }
+
+        function finalizeCompetitionIfUnlocked() {
+            if (!isTeacherUnlocked) {
+                alert("🔒 إعلان النتائج والختام مخصص للمعلمة فقط.");
+                toggleAdminAuth();
+                return;
+            }
+            finalizeCompetition();
+        }
+
+        // ================== اعتماد الاستلام المباشر للمنطقة ومنح النقاط ==================
+        function confirmDirectAward() {
+            const region = state.regions.find(r => r.id === currentActiveRegionId);
+            const selectedTeamId = parseInt(document.getElementById('modalTeamSelect').value);
+            const winnerTeam = state.teams.find(t => t.id === selectedTeamId);
+
+            if (!region || !winnerTeam) return;
+
+            // خصم نقاط المنطقة من المالك السابق إن وجد
+            if (region.capturedBy && region.capturedBy !== winnerTeam.id) {
+                const prevTeam = state.teams.find(t => t.id === region.capturedBy);
+                if (prevTeam) prevTeam.mapScore = Math.max(0, (prevTeam.mapScore || 0) - region.points);
+            }
+
+            region.capturedBy = winnerTeam.id;
+            winnerTeam.mapScore = (winnerTeam.mapScore || 0) + region.points;
+
+            state.latestEvent = `🎉 تم استلام (${region.name}) من قبل (${winnerTeam.name}) ونالت ${region.points} نقطة سرية في درجات المناطق!`;
+
+            saveState();
+            closeModal('regionActionModal');
+            renderMap();
+            renderTeams();
+            document.getElementById('latestEventText').innerText = state.latestEvent;
+
+            triggerCelebration(winnerTeam.name, region.name, region.points);
+        }
+
+        // ================== رصد درجات المعايير المفصولة لكل معيار على حدة ==================
+        function adjustSpecificCriteria(teamId, type, delta, label) {
+            if (!isTeacherUnlocked) {
+                alert("🔒 يجب فتح القفل الخاص بالمعلمة لتعديل درجات المعايير!");
+                return;
+            }
+            const team = state.teams.find(t => t.id === teamId);
+            if (!team) return;
+
+            if (type === 'attendance') {
+                team.attendanceScore = (team.attendanceScore || 0) + delta;
+            } else if (type === 'sard') {
+                team.sardScore = (team.sardScore || 0) + delta;
+            } else if (type === 'hifz') {
+                team.hifzScore = (team.hifzScore || 0) + delta;
+            }
+
+            state.latestEvent = `تم رصد (${delta > 0 ? '+' : ''}${delta}) في [${label}] لمجموعة (${team.name})`;
+            
+            saveState();
+            renderTeams();
+            document.getElementById('latestEventText').innerText = state.latestEvent;
+        }
+
+        function triggerCelebration(teamName, regionName, points) {
+            if (window.confetti) {
+                confetti({ particleCount: 90, spread: 90, origin: { y: 0.6 } });
+                setTimeout(() => {
+                    confetti({ particleCount: 60, angle: 60, spread: 60, origin: { x: 0 } });
+                    confetti({ particleCount: 60, angle: 120, spread: 60, origin: { x: 1 } });
+                }, 300);
+            }
+
+            const zone = document.getElementById('balloonsZone');
+            const emojis = ['🎈', '🎉', '🌟', '✨', '🎈', '🎊'];
+            for (let i = 0; i < 18; i++) {
+                const b = document.createElement('div');
+                b.className = 'balloon';
+                b.innerText = emojis[Math.floor(Math.random() * emojis.length)];
+                b.style.left = Math.random() * 90 + 5 + '%';
+                b.style.animationDelay = Math.random() * 1.5 + 's';
+                zone.appendChild(b);
+                setTimeout(() => b.remove(), 5500);
+            }
+
+            playChimeSound();
+
+            const pop = document.createElement('div');
+            pop.className = 'success-overlay';
+            pop.innerHTML = `
+                <div class="success-card">
+                    <span class="text-7xl">🎈</span>
+                    <h2 class="text-3xl font-extrabold mt-4">مبارك لمجموعة ${teamName}!</h2>
+                    <p class="text-xl mt-2 font-bold">تم فتح ${regionName} وإضافة نقاطها لدرجات المناطق:</p>
+                    <div class="my-4 inline-block bg-white text-[#2D3C59] px-6 py-2 rounded-2xl text-2xl font-black shadow">
+                        +${points} نقطة للمناطق 🗺️
+                    </div>
+                    <br>
+                    <button onclick="this.closest('.success-overlay').remove()" class="mt-4 bg-[#2D3C59] text-white px-8 py-2.5 rounded-full font-bold shadow-lg hover:bg-opacity-90">
+                        مواصلة المسابقة 🚀
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(pop);
+        }
+
+        function checkAndPlayLatestCelebrationOnLoad() {
+            const captured = state.regions.filter(r => r.capturedBy !== null);
+            if (captured.length > 0 && !isTeacherUnlocked) {
+                setTimeout(() => {
+                    if (window.confetti) confetti({ particleCount: 50, spread: 70, origin: { y: 0.7 } });
+                }, 900);
+            }
+        }
+
+        function playChimeSound() {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, idx) => {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.frequency.value = freq;
+                    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.8 + (idx * 0.2));
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(ctx.currentTime + (idx * 0.15));
+                    osc.stop(ctx.currentTime + 1.2 + (idx * 0.15));
+                });
+            } catch (e) {}
+        }
+
+        function renderMap() {
+            let capturedCount = 0;
+
+            state.regions.forEach(region => {
+                const poly = document.getElementById(`poly-${region.id}`);
+                const badge = document.getElementById(`badge-${region.id}`);
+                if (!poly) return;
+
+                if (region.capturedBy) {
+                    capturedCount++;
+                    const team = state.teams.find(t => t.id === region.capturedBy);
+                    const teamColor = team ? team.color : '#94A378';
+
+                    poly.setAttribute('fill', teamColor);
+                    poly.setAttribute('stroke', '#FFFFFF');
+                    poly.setAttribute('stroke-width', '2.5');
+
+                    if (badge) {
+                        badge.textContent = `⭐ ${team ? team.name : 'مستلمة'}`;
+                        badge.setAttribute('fill', '#FFE082');
+                    }
+                } else {
+                    poly.setAttribute('fill', region.defaultColor);
+                    poly.setAttribute('stroke', '#2D3C59');
+                    poly.setAttribute('stroke-width', '2');
+
+                    if (badge) {
+                        badge.textContent = state.isStarted ? '🔓 متاحة' : '🔒 سرية';
+                        badge.setAttribute('fill', '#FFFFFF');
+                        badge.setAttribute('opacity', '0.9');
+                    }
+                }
+            });
+
+            document.getElementById('regionsCapturedCount').innerText = `المناطق المستلمة: ${capturedCount} / 13`;
+        }
+
+        function addNewTeam() {
+            if (!isTeacherUnlocked) {
+                alert("🔒 يجب فتح القفل الخاص بالمعلمة أولاً!");
+                toggleAdminAuth();
+                return;
+            }
+
+            const nameInput = document.getElementById('newTeamName');
+            const membersInput = document.getElementById('newTeamMembers');
+            const name = nameInput.value.trim();
+
+            if (!name) return alert("الرجاء إدخال اسم المجموعة!");
+
+            const members = membersInput.value
+                .split(/[\n,]+/)
+                .map(m => m.trim())
+                .filter(m => m.length > 0);
+
+            const newTeam = {
+                id: Date.now(),
+                name: name,
+                members: members,
+                attendanceScore: 0,
+                sardScore: 0,
+                hifzScore: 0,
+                mapScore: 0,
+                color: teamPalette[state.teams.length % teamPalette.length]
+            };
+
+            state.teams.push(newTeam);
+            saveState();
+
+            nameInput.value = '';
+            membersInput.value = '';
+            renderTeams();
+            alert(`✅ تمت إضافة (${name}) بنجاح!`);
+        }
+
+        function deleteTeam(id) {
+            if (!isTeacherUnlocked) return alert("🔒 خاص بالمعلمة فقط.");
+            if (!confirm("هل أنتِ متأكدة من حذف هذه المجموعة؟")) return;
+
+            state.regions.forEach(r => {
+                if (r.capturedBy === id) r.capturedBy = null;
+            });
+
+            state.teams = state.teams.filter(t => t.id !== id);
+            saveState();
+            renderMap();
+            renderTeams();
+        }
+
+        function openEditTeamModal(id) {
+            if (!isTeacherUnlocked) return alert("🔒 خاص بالمعلمة فقط.");
+            const team = state.teams.find(t => t.id === id);
+            if (!team) return;
+
+            document.getElementById('editTeamId').value = team.id;
+            document.getElementById('editTeamNameInput').value = team.name;
+            document.getElementById('editTeamMembersInput').value = team.members.join('\n');
+            openModal('editTeamModal');
+        }
+
+        function saveTeamEdits() {
+            const id = parseInt(document.getElementById('editTeamId').value);
+            const team = state.teams.find(t => t.id === id);
+            if (!team) return;
+
+            const name = document.getElementById('editTeamNameInput').value.trim();
+            if (!name) return alert("الرجاء إدخال الاسم!");
+
+            team.name = name;
+            team.members = document.getElementById('editTeamMembersInput').value
+                .split(/[\n,]+/)
+                .map(m => m.trim())
+                .filter(m => m.length > 0);
+
+            saveState();
+            closeModal('editTeamModal');
+            renderMap();
+            renderTeams();
+        }
+
+        // ================== لوحة الصدارة مع إبراز درجات التقييم بالتفصيل للطالبات ==================
+        function renderTeams() {
+            const container = document.getElementById('teamsListContainer');
+            const countBadge = document.getElementById('teamsCountBadge');
+            countBadge.innerText = state.teams.length;
+
+            if (state.teams.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-400">
+                        <span class="text-4xl block mb-2">👥</span>
+                        <p class="text-sm">لم يتم تسجيل أي فريق بعد.</p>
+                        <p class="text-xs mt-1 text-amber-600 font-bold">يلزم إضافة فريقين على الأقل للبدء!</p>
+                    </div>
+                `;
+                return;
+            }
+
+            // ترتيب الفرق تنازلياً بحسب المجموع الكلي
+            const sorted = [...state.teams].sort((a, b) => {
+                const totalA = (a.attendanceScore || 0) + (a.sardScore || 0) + (a.hifzScore || 0) + (a.mapScore || 0);
+                const totalB = (b.attendanceScore || 0) + (b.sardScore || 0) + (b.hifzScore || 0) + (b.mapScore || 0);
+                return totalB - totalA;
+            });
+
+            container.innerHTML = sorted.map((team, index) => {
+                const capturedRegions = state.regions.filter(r => r.capturedBy === team.id);
+                const attendance = team.attendanceScore || 0;
+                const sard = team.sardScore || 0;
+                const hifz = team.hifzScore || 0;
+                const mapScore = team.mapScore || 0;
+                const totalScore = attendance + sard + hifz + mapScore;
+
+                return `
+                <div class="bg-gray-50 hover:bg-white p-4 rounded-2xl border border-gray-200 transition shadow-sm relative overflow-hidden">
+                    <div class="w-2 absolute top-0 right-0 bottom-0" style="background-color: ${team.color}"></div>
+                    
+                    <!-- الترويسة واسم المجموعة والمجموع النهائي -->
+                    <div class="flex items-start justify-between gap-2 pr-2">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-black text-white bg-[#2D3C59] w-5 h-5 rounded-full flex items-center justify-center">${index + 1}</span>
+                                <h4 class="font-extrabold text-[#2D3C59] text-base">${team.name}</h4>
+                            </div>
+                            <div class="text-xs text-gray-400 mt-1">
+                                ${team.members.length ? team.members.join('، ') : 'بدون أسماء مدخلة'}
+                            </div>
+                        </div>
+                        
+                        <!-- إجمالي النقاط الكلي -->
+                        <div class="text-left bg-white px-3 py-1.5 rounded-xl border border-gray-200 shadow-sm">
+                            <div class="text-xl font-black text-[#2D3C59]">${totalScore}</div>
+                            <div class="text-[9px] text-gray-400 font-bold">المجموع الكلي</div>
+                        </div>
+                    </div>
+
+                    <!-- شبكة تفصيل درجات التقييم (ظاهرة للطالبات والجميع بالتفصيل) -->
+                    <div class="mt-3 bg-white p-2.5 rounded-xl border border-gray-100">
+                        <div class="text-[11px] font-bold text-gray-500 mb-2 flex items-center justify-between">
+                            <span>📊 تفصيل درجات التقييم:</span>
+                            <span class="text-[10px] text-gray-400">مجموع المعايير: ${(attendance + sard + hifz) > 0 ? '+' : ''}${attendance + sard + hifz}</span>
+                        </div>
+                        
+                        <div class="grid grid-cols-3 gap-1.5 text-center">
+                            <!-- الحضور الكامل -->
+                            <div class="bg-blue-50/70 p-1.5 rounded-lg border border-blue-100">
+                                <div class="text-[10px] text-blue-700 font-bold">🕒 الحضور</div>
+                                <div class="text-sm font-black text-blue-900 mt-0.5">${attendance > 0 ? '+' : ''}${attendance}</div>
+                            </div>
+
+                            <!-- السرد الكامل -->
+                            <div class="bg-emerald-50/70 p-1.5 rounded-lg border border-emerald-100">
+                                <div class="text-[10px] text-emerald-700 font-bold">📖 السرد</div>
+                                <div class="text-sm font-black text-emerald-900 mt-0.5">${sard > 0 ? '+' : ''}${sard}</div>
+                            </div>
+
+                            <!-- الحفظ المتقن -->
+                            <div class="bg-purple-50/70 p-1.5 rounded-lg border border-purple-100">
+                                <div class="text-[10px] text-purple-700 font-bold">🎯 الإتقان</div>
+                                <div class="text-sm font-black text-purple-900 mt-0.5">${hifz > 0 ? '+' : ''}${hifz}</div>
+                            </div>
+                        </div>
+
+                        <!-- نقاط مناطق الخريطة المستلمة -->
+                        <div class="mt-2 bg-amber-50 p-2 rounded-lg border border-amber-100 flex items-center justify-between text-xs">
+                            <span class="text-[11px] font-bold text-amber-900 flex items-center gap-1">
+                                <span>🗺️ نقاط المناطق:</span>
+                                <span class="text-[10px] text-amber-700">(${capturedRegions.length} مناطق مستلمة)</span>
+                            </span>
+                            <span class="text-sm font-black text-amber-800">${mapScore} نقطة</span>
+                        </div>
+                    </div>
+
+                    <!-- شريط المناطق المستلمة -->
+                    <div class="mt-2 text-xs bg-white p-2 rounded-xl border border-gray-100 flex flex-wrap gap-1 items-center">
+                        <span class="text-gray-400 font-medium text-[11px]">المناطق:</span>
+                        ${capturedRegions.length > 0 ? capturedRegions.map(r => `
+                            <span class="bg-[#94A378]/20 text-[#364222] font-bold px-2 py-0.5 rounded-lg text-[11px]">${r.name.replace('منطقة ', '')}</span>
+                        `).join('') : '<span class="text-gray-400 text-[11px]">لا توجد مناطق بعد</span>'}
+                    </div>
+
+                    <!-- أزرار رصد درجات المعايير (+3/-3, +4/-4) - تظهر فقط عند فتح قفل المعلمة -->
+                    ${isTeacherUnlocked ? `
+                    <div class="mt-3 pt-2 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500 text-[11px]">حضور:</span>
+                            <button onclick="adjustSpecificCriteria(${team.id}, 'attendance', 3, 'الحضور الكامل')" class="counter-btn bg-green-100 text-green-700 hover:bg-green-200">+3</button>
+                            <button onclick="adjustSpecificCriteria(${team.id}, 'attendance', -3, 'نقص الحضور')" class="counter-btn bg-rose-100 text-rose-700 hover:bg-rose-200">-3</button>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500 text-[11px]">سرد:</span>
+                            <button onclick="adjustSpecificCriteria(${team.id}, 'sard', 4, 'السرد الكامل')" class="counter-btn bg-green-100 text-green-700 hover:bg-green-200">+4</button>
+                            <button onclick="adjustSpecificCriteria(${team.id}, 'sard', -4, 'نقص السرد')" class="counter-btn bg-rose-100 text-rose-700 hover:bg-rose-200">-4</button>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <span class="text-gray-500 text-[11px]">إتقان:</span>
+                            <button onclick="adjustSpecificCriteria(${team.id}, 'hifz', 3, 'الحفظ المتقن')" class="counter-btn bg-green-100 text-green-700 hover:bg-green-200">+3</button>
+                            <button onclick="adjustSpecificCriteria(${team.id}, 'hifz', -3, 'نقص الإتقان')" class="counter-btn bg-rose-100 text-rose-700 hover:bg-rose-200">-3</button>
+                        </div>
+                        <div class="flex items-center gap-2 mr-auto">
+                            <button onclick="openEditTeamModal(${team.id})" class="text-blue-500 hover:text-blue-700 text-sm">✏️</button>
+                            <button onclick="deleteTeam(${team.id})" class="text-rose-400 hover:text-rose-600 text-sm">🗑️</button>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                </div>
+                `;
+            }).join('');
+        }
+
+        function revealAllPointsModal() {
+            const tbody = document.getElementById('revealTableBody');
+            let sum = 0;
+
+            tbody.innerHTML = state.regions.map(r => {
+                sum += r.points;
+                const team = state.teams.find(t => t.id === r.capturedBy);
+                return `
+                <tr class="hover:bg-gray-50">
+                    <td class="p-2.5 font-bold text-[#2D3C59]">${r.name}</td>
+                    <td class="p-2.5 text-center font-extrabold text-[#D1855C]">${r.points} نقطة</td>
+                    <td class="p-2.5 text-center">
+                        ${team ? `<span class="bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full font-bold">تم استلامها من قبل ${team.name}</span>` 
+                               : `<span class="bg-gray-100 text-gray-500 text-xs px-2 py-0.5 rounded-full">لم تُستملك بعد (متاحة)</span>`}
+                    </td>
+                </tr>
+                `;
+            }).join('');
+
+            document.getElementById('revealTotalPointsSum').innerText = `${sum} نقطة بالتمام والكمال ✅`;
+            openModal('revealPointsModal');
+        }
+
+        function finalizeCompetition() {
+            if (state.teams.length === 0) return alert("لا توجد مجموعات بعد لعرض النتائج!");
+            
+            const sorted = [...state.teams].sort((a, b) => {
+                const totalA = (a.attendanceScore || 0) + (a.sardScore || 0) + (a.hifzScore || 0) + (a.mapScore || 0);
+                const totalB = (b.attendanceScore || 0) + (b.sardScore || 0) + (b.hifzScore || 0) + (b.mapScore || 0);
+                return totalB - totalA;
+            });
+
+            const container = document.getElementById('podiumCardsContainer');
+            const medals = ['🥇 المركز الأول', '🥈 المركز الثاني', '🥉 المركز الثالث'];
+            const heights = ['md:h-72', 'md:h-60', 'md:h-52'];
+
+            container.innerHTML = sorted.slice(0, 3).map((team, idx) => {
+                const criteria = (team.attendanceScore || 0) + (team.sardScore || 0) + (team.hifzScore || 0);
+                const total = criteria + (team.mapScore || 0);
+                return `
+                <div class="bg-gradient-to-b from-gray-50 to-white p-5 rounded-3xl border-2 border-[#94A378]/30 flex flex-col justify-between items-center shadow-lg ${heights[idx]}">
+                    <span class="text-xs font-bold text-[#D1855C] bg-[#D1855C]/10 px-3 py-1 rounded-full">${medals[idx]}</span>
+                    <div class="my-2">
+                        <h4 class="text-xl font-extrabold text-[#2D3C59]">${team.name}</h4>
+                        <div class="text-xs text-gray-400 mt-1">${team.members.slice(0, 3).join('، ')}</div>
+                    </div>
+                    <div class="w-full text-center bg-gray-50 p-2 rounded-xl border border-gray-100">
+                        <div class="text-[10px] text-gray-500 font-bold">معايير: ${criteria} (حضور:${team.attendanceScore||0} سرد:${team.sardScore||0} حفظ:${team.hifzScore||0})</div>
+                        <div class="text-[10px] text-amber-700 font-bold mt-0.5">نقاط المناطق: ${team.mapScore || 0}</div>
+                        <div class="text-2xl font-black text-[#94A378] mt-1">${total} <span class="text-xs font-normal">نقطة</span></div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+
+            if (window.confetti) confetti({ particleCount: 120, spread: 100, origin: { y: 0.5 } });
+
+            openModal('finalPodiumModal');
+        }
+
+        function openModal(id) { document.getElementById(id).classList.remove('hidden'); }
+        function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+    </script>
+</body>
+</html>
