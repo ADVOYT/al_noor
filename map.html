@@ -64,14 +64,15 @@
 </head>
 <body class="text-[#2D3C59] min-h-screen p-3 md:p-8">
 
-    <!-- شريط الإشعارات العلوي وحالة القفل والمشاركة -->
+    <!-- شريط الإشعارات العلوي وحالة القفل والمزامنة -->
     <div class="max-w-7xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
         <div class="flex items-center gap-2">
             <a href="index.html" class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-2xl font-bold text-sm transition flex items-center gap-1">
                 ⬅ الرئيسية
             </a>
-            <button id="copyShareBtn" onclick="copyShareableLink()" class="bg-[#94A378]/20 hover:bg-[#94A378]/30 text-[#4c5737] px-4 py-2 rounded-2xl font-bold text-xs md:text-sm transition flex items-center gap-2">
-                🔗 نسخ رابط مشاركة النتائج للطالبات
+            <!-- زر الاعتماد والنشر المباشر لجميع الأجهزة (يظهر فقط عند فتح قفل المعلمة) -->
+            <button id="publishCloudBtn" onclick="publishChangesToCloud()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-2xl font-extrabold text-xs md:text-sm transition flex items-center gap-2 shadow-md animate-bounce">
+                <span>💾 اعتماد ونشر التحديثات للجميع</span>
             </button>
         </div>
 
@@ -101,7 +102,7 @@
 
         <h1 class="text-3xl md:text-5xl font-extrabold mb-3">🗺️ ميدان تحدي المناطق الـ 13</h1>
         <p class="max-w-2xl mx-auto text-gray-200 text-sm md:text-base leading-relaxed">
-            عرض تفصيلي لدرجات كل معيار (الحضور، السرد، الحفظ) بالإضافة إلى درجات مناطق الخريطة المستلمة بشكل مستقل تماماً لكل فريق!
+            رابط موحد ومباشر للطالبات يعرض تفاصيل التقييم بدقة ونقاط المناطق المستلمة فور اعتمادها من قِبل المعلمة!
         </p>
 
         <!-- لوحة المعايير السريعة -->
@@ -127,9 +128,9 @@
                     <p id="mapSubNotice" class="text-xs text-gray-400 mt-1">النقاط محجوبة وسرية 🔒 اضغطي على أي منطقة للاستعلام أو اختيارها</p>
                 </div>
 
-                <!-- أزرار الإشراف -->
+                <!-- أزرار الإشراف (تخضع لقاعدة اللعبة الواحدة والقفل العام) -->
                 <div class="flex items-center gap-2 flex-wrap">
-                    <button id="startCompetitionBtn" onclick="toggleStartCompetition()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-extrabold transition shadow flex items-center gap-1.5">
+                    <button id="startCompetitionBtn" onclick="handleGameFlowAction()" class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-xl font-extrabold transition shadow flex items-center gap-1.5">
                         <span>🚀 بدء المسابقة</span>
                     </button>
                     
@@ -412,9 +413,15 @@
             
             <div id="podiumCardsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end"></div>
 
-            <button onclick="closeModal('finalPodiumModal')" class="bg-[#94A378] text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-opacity-90 transition">
-                إغلاق واحتفال 🎉
-            </button>
+            <div class="flex flex-col sm:flex-row gap-3 justify-center items-center">
+                <button onclick="closeModal('finalPodiumModal')" class="bg-[#94A378] text-white px-8 py-3 rounded-full font-bold shadow-lg hover:bg-opacity-90 transition">
+                    إغلاق واحتفال 🎉
+                </button>
+                <!-- يظهر فقط للمعلمة عند انتهاء المسابقة لبدء مسابقة جديدة وتصفير الخريطة -->
+                <button id="resetNewGameBtn" onclick="resetAndStartFreshGame()" class="hidden bg-rose-600 hover:bg-rose-700 text-white px-6 py-3 rounded-full font-bold shadow-lg transition">
+                    🔄 أرشفة وتصفير لبدء مسابقة جديدة
+                </button>
+            </div>
         </div>
     </div>
 
@@ -448,6 +455,12 @@
         const ADMIN_PASS = "qwerty";
         let isTeacherUnlocked = false;
 
+        // ========================================================
+        // 🔗 رابط المخزن السحابي الموحد (npoint.io)
+        // ضعي رابطك من موقع npoint.io هنا ليتم النشر التلقائي للجميع
+        // ========================================================
+        const CLOUD_STORAGE_URL = "https://api.npoint.io/d54220c202b6c7f0fcd7"; 
+
         const defaultRegions = [
             { id: 'riyadh', name: 'منطقة الرياض', points: 180, defaultColor: '#C5A506', capturedBy: null },
             { id: 'makkah', name: 'منطقة مكة المكرمة', points: 170, defaultColor: '#008B7D', capturedBy: null },
@@ -470,7 +483,7 @@
         ];
 
         let state = {
-            isStarted: false,
+            gameStatus: 'not_started', // الحالات: 'not_started' | 'active' | 'ended'
             regions: defaultRegions,
             teams: [],
             latestEvent: "المسابقة بانتظار إعلان البدء من قِبل المعلمة."
@@ -478,8 +491,8 @@
 
         let currentActiveRegionId = null;
 
-        window.addEventListener('DOMContentLoaded', () => {
-            loadState();
+        window.addEventListener('DOMContentLoaded', async () => {
+            await loadState();
             applyLockUI();
             renderMap();
             renderTeams();
@@ -487,52 +500,35 @@
             checkAndPlayLatestCelebrationOnLoad();
         });
 
-        function saveState() {
+        function saveLocalState() {
             localStorage.setItem('saudi_3d_competition_data', JSON.stringify(state));
         }
 
-        function loadState() {
-            const hash = window.location.hash;
-            
-            // 1. فحص النسق المضغوط الجديد فائق القصر (#d=)
-            if (hash && hash.startsWith('#d=')) {
+        // تحميل البيانات تلقائياً من الرابط السحابي الموحد لجميع الطالبات
+        async function loadState() {
+            // 1. محاولة جلب أحدث نسخة من المخزن السحابي الموحد
+            if (CLOUD_STORAGE_URL && !CLOUD_STORAGE_URL.includes("ضع_رابط")) {
                 try {
-                    const raw = decodeURIComponent(escape(atob(hash.replace('#d=', ''))));
-                    const c = JSON.parse(raw);
-                    if (c && c.t) {
-                        state.isStarted = c.s === 1;
-                        state.latestEvent = c.e || state.latestEvent;
-                        state.teams = c.t.map((arr, idx) => ({
-                            id: 1000 + idx,
-                            name: arr[0],
-                            members: arr[1] || [],
-                            attendanceScore: arr[2] || 0,
-                            sardScore: arr[3] || 0,
-                            hifzScore: arr[4] || 0,
-                            mapScore: arr[5] || 0,
-                            color: arr[6] || teamPalette[idx % teamPalette.length]
-                        }));
-                        state.regions = defaultRegions.map((reg, idx) => {
-                            const teamIdx = c.r ? c.r[idx] : -1;
-                            const capId = (teamIdx !== undefined && teamIdx !== -1 && state.teams[teamIdx]) 
-                                ? state.teams[teamIdx].id 
-                                : null;
-                            return { ...reg, capturedBy: capId };
-                        });
-                        saveState();
-                        return;
+                    const res = await fetch(CLOUD_STORAGE_URL);
+                    if (res.ok) {
+                        const cloudData = await res.json();
+                        if (cloudData && cloudData.regions && cloudData.teams) {
+                            state = cloudData;
+                            saveLocalState();
+                            return;
+                        }
                     }
                 } catch (e) {
-                    console.warn("تعذر فك الرابط المضغوط", e);
+                    console.log("استخدام البيانات المحلية كنسخة احتياطية");
                 }
             }
 
-            // 2. التحميل من التخزين المحلي
+            // 2. النسخة الاحتياطية من التخزين المحلي
             const saved = localStorage.getItem('saudi_3d_competition_data');
             if (saved) {
                 try {
                     const parsed = JSON.parse(saved);
-                    state.isStarted = parsed.isStarted || false;
+                    state.gameStatus = parsed.gameStatus || (parsed.isStarted ? 'active' : 'not_started');
                     state.regions = parsed.regions || defaultRegions;
                     state.teams = (parsed.teams || []).map(t => ({
                         ...t,
@@ -548,65 +544,48 @@
             }
         }
 
-        // ================== نظام تقصير الرابط الفائق ==================
-        async function copyShareableLink() {
-            const btn = document.getElementById('copyShareBtn');
-            const originalText = btn.innerHTML;
-            btn.innerHTML = "⏳ جاري توليد الرابط المختصر...";
+        // ================== زر اعتماد ونشر التغييرات للجميع ==================
+        async function publishChangesToCloud() {
+            if (!isTeacherUnlocked) return;
+
+            const btn = document.getElementById('publishCloudBtn');
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = "⏳ جاري النشر لجميع الأجهزة...";
             btn.disabled = true;
 
-            // استخلاص البيانات الجوهرية فقط وتجريد كافة التكرارات
-            const compactData = {
-                s: state.isStarted ? 1 : 0,
-                e: state.latestEvent,
-                t: state.teams.map(t => [
-                    t.name,
-                    t.members,
-                    t.attendanceScore || 0,
-                    t.sardScore || 0,
-                    t.hifzScore || 0,
-                    t.mapScore || 0,
-                    t.color
-                ]),
-                r: state.regions.map(r => {
-                    if (r.capturedBy === null) return -1;
-                    return state.teams.findIndex(t => t.id === r.capturedBy);
-                })
-            };
+            saveLocalState();
 
-            const base64Str = btoa(unescape(encodeURIComponent(JSON.stringify(compactData))));
-            const baseUri = window.location.origin + window.location.pathname;
-            const fullCompactUrl = `${baseUri}#d=${base64Str}`;
+            if (CLOUD_STORAGE_URL && !CLOUD_STORAGE_URL.includes("ضع_رابط")) {
+                try {
+                    const response = await fetch(CLOUD_STORAGE_URL, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(state)
+                    });
 
-            let finalUrl = fullCompactUrl;
-
-            // محاولة اختصاره برابط فائق القصر (TinyURL) فورياً
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 2500); // مهلة ثانيتين ونصف كحد أقصى
-
-                const response = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(fullCompactUrl)}`, {
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-
-                if (response.ok) {
-                    const shortText = await response.text();
-                    if (shortText && shortText.startsWith("http")) {
-                        finalUrl = shortText.trim();
+                    if (response.ok) {
+                        alert("✅ تم اعتماد ونشر التحديثات بنجاح!\n\nالآن كل طالبة تفتح الرابط المعتاد ستظهر لها التعديلات فوراً دون الحاجة لإرسال أي روابط جديدة.");
+                    } else {
+                        alert("⚠️ تم الحفظ محلياً. يرجى التأكد من صحة رابط المخزن السحابي.");
                     }
+                } catch (e) {
+                    alert("⚠️ تم الحفظ محلياً. تأكدي من اتصال الإنترنت لنشرها سحابياً.");
                 }
-            } catch (err) {
-                // في حال غياب الإنترنت أو تعذر الخدمة نستخدم الرابط المضغوط الصغير فوراً
+            } else {
+                alert("💡 تم الحفظ بنجاح!\n\nلتفعيل التحديث الفوري الموحد في هواتف جميع الطالبات، ضعي رابط npoint.io في سطر 473 في الكود.");
             }
 
-            btn.innerHTML = originalText;
+            btn.innerHTML = originalHTML;
             btn.disabled = false;
+        }
 
-            navigator.clipboard.writeText(finalUrl).then(() => {
-                alert(`✅ تم نسخ رابط الطالبات بنجاح!\n\nرابط مختصر وأنيق جاهز للمشاركة في الواتساب:\n${finalUrl}`);
+        // نسخ الرابط الموحد للمشاركة
+        function copyShareableLink() {
+            const baseUri = window.location.origin + window.location.pathname;
+            navigator.clipboard.writeText(baseUri).then(() => {
+                alert(`✅ تم نسخ رابط الموقع الموحد للطالبات:\n${baseUri}\n\nهذا هو الرابط الدائم، ولن تحتاجي لتغييره إطلاقاً؛ فكل ما تعتمدينه سيظهر هنا تلقائياً!`);
             }).catch(() => {
-                prompt("انسخي رابط المشاركة من هنا:", finalUrl);
+                prompt("انسخي رابط الموقع من هنا:", baseUri);
             });
         }
 
@@ -632,6 +611,8 @@
             const authBtn = document.getElementById('authToggleBtn');
             const lockOverlay = document.getElementById('addTeamLockOverlay');
             const revealBtn = document.getElementById('revealPointsBtn');
+            const publishBtn = document.getElementById('publishCloudBtn');
+            const resetBtn = document.getElementById('resetNewGameBtn');
 
             if (isTeacherUnlocked) {
                 badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span><span>لوحة المعلمة مفتوحة ✅</span>`;
@@ -641,6 +622,8 @@
                 
                 if (lockOverlay) lockOverlay.classList.add('hidden');
                 if (revealBtn) revealBtn.innerHTML = "👁️ كشف نقاط الخريطة";
+                if (publishBtn) publishBtn.classList.remove('hidden');
+                if (resetBtn && state.gameStatus === 'ended') resetBtn.classList.remove('hidden');
             } else {
                 badge.innerHTML = `<span class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></span><span>🔒 وضع الزائر (المشاهدة فقط)</span>`;
                 badge.className = "flex items-center gap-2 px-4 py-1.5 rounded-full text-xs md:text-sm font-bold bg-amber-50 text-amber-800 border border-amber-200";
@@ -649,33 +632,38 @@
                 
                 if (lockOverlay) lockOverlay.classList.remove('hidden');
                 if (revealBtn) revealBtn.innerHTML = "🔒 كشف النقاط (مقفل)";
+                if (publishBtn) publishBtn.classList.add('hidden');
+                if (resetBtn) resetBtn.classList.add('hidden');
             }
 
             renderTeams();
         }
 
-        function toggleStartCompetition() {
+        // ================== إدارة دورة اللعبة الواحدة (Single Active Game) ==================
+        function handleGameFlowAction() {
             if (!isTeacherUnlocked) {
                 alert("🔒 عذراً، يجب فتح القفل الخاص بالمعلمة أولاً!");
                 toggleAdminAuth();
                 return;
             }
 
-            if (!state.teams || state.teams.length < 2) {
-                alert("⚠️ لا يمكن بدء المسابقة قبل تسجيل فريقين على الأقل وأسماء عضواتهما!");
+            if (state.gameStatus === 'not_started') {
+                if (!state.teams || state.teams.length < 2) {
+                    alert("⚠️ لا يمكن بدء المسابقة قبل تسجيل فريقين على الأقل وأسماء عضواتهما!");
+                    return;
+                }
+                state.gameStatus = 'active';
+                state.latestEvent = "🔥 انطلقت المسابقة رسمياً! الخريطة مفتوحة الآن لتحديد المجموعات واستلام المناطق.";
+                if (window.confetti) confetti({ particleCount: 70, spread: 80 });
+            } else if (state.gameStatus === 'active') {
+                alert("ℹ️ المسابقة جارية حالياً ولا يمكن فتح مسابقة أخرى بالتوازي.\nلإنهاء هذه المسابقة وتتويج الفائز، اضغطي على زر (🏆 إعلان الختام).");
+                return;
+            } else if (state.gameStatus === 'ended') {
+                alert("🏁 هذه المسابقة انتهت وتم اعتماد نتائجها وتتويج الفائز.\nلبدء مسابقة جديدة بالكامل، افتحي نافذة إعلان الختام واضغطي (أرشفة وتصفير).");
                 return;
             }
 
-            state.isStarted = !state.isStarted;
-
-            if (state.isStarted) {
-                state.latestEvent = "🔥 انطلقت المسابقة رسمياً! الخريطة مفتوحة الآن لتحديد المجموعات واستلام المناطق.";
-                if (window.confetti) confetti({ particleCount: 70, spread: 80 });
-            } else {
-                state.latestEvent = "تم إيقاف المسابقة مؤقتاً بواسطة المعلمة.";
-            }
-
-            saveState();
+            saveLocalState();
             updateCompetitionStatusDisplay();
             renderMap();
         }
@@ -686,12 +674,18 @@
             const subNotice = document.getElementById('mapSubNotice');
             const latestEvent = document.getElementById('latestEventText');
 
-            if (state.isStarted) {
-                headerBadge.innerText = "🔥 المسابقة جارية والتنافس مشتعل";
+            if (state.gameStatus === 'active') {
+                headerBadge.innerText = "🔥 المسابقة جارية (لعبة نشطة)";
                 headerBadge.className = "inline-block bg-emerald-600 text-white text-xs font-black px-4 py-1.5 rounded-full shadow animate-pulse";
-                startBtn.innerHTML = "⏸️ إيقاف المسابقة مؤقتاً";
-                startBtn.className = "text-xs bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl font-extrabold transition shadow";
+                startBtn.innerHTML = "⚡ المسابقة جارية";
+                startBtn.className = "text-xs bg-emerald-700 text-white px-4 py-2 rounded-xl font-extrabold cursor-default shadow";
                 subNotice.innerText = "المسابقة جارية! اضغطي على أي منطقة لمعرفة إن كانت متاحة أو تم استلامها";
+            } else if (state.gameStatus === 'ended') {
+                headerBadge.innerText = "🏁 المسابقة منتهية ومؤرشفة";
+                headerBadge.className = "inline-block bg-purple-700 text-white text-xs font-black px-4 py-1.5 rounded-full shadow";
+                startBtn.innerHTML = "🏆 عرض النتائج النهائية";
+                startBtn.className = "text-xs bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-extrabold transition shadow";
+                subNotice.innerText = "المسابقة انتهت وتم تتويج المجموعات الفائزة 🌟";
             } else {
                 headerBadge.innerText = "⏳ بانتظار بدء المسابقة";
                 headerBadge.className = "inline-block bg-amber-500 text-white text-xs font-black px-4 py-1.5 rounded-full shadow";
@@ -703,6 +697,32 @@
             latestEvent.innerText = state.latestEvent;
         }
 
+        // تصفير الخريطة وأرشفة اللعبة السابقة بعد انتهائها
+        function resetAndStartFreshGame() {
+            if (!isTeacherUnlocked) return;
+            const confirmReset = confirm("⚠️ تنبيه هام:\nهل أنتِ متأكدة من تصفير مناطق الخريطة والدرجات لبدء مسابقة جديدة بالكامل؟\n(سيتم الاحتفاظ بأسماء المجموعات وتصفير نقاطها وخريطتها).");
+            if (!confirmReset) return;
+
+            state.gameStatus = 'not_started';
+            state.regions = defaultRegions.map(r => ({ ...r, capturedBy: null }));
+            state.teams = state.teams.map(t => ({
+                ...t,
+                attendanceScore: 0,
+                sardScore: 0,
+                hifzScore: 0,
+                mapScore: 0
+            }));
+            state.latestEvent = "تم تصفير المسابقة وبدء موسم منافسة جديد! بانتظار إشارة الانطلاق.";
+
+            saveLocalState();
+            closeModal('finalPodiumModal');
+            updateCompetitionStatusDisplay();
+            applyLockUI();
+            renderMap();
+            renderTeams();
+            alert("✅ تم تصفير المسابقة بنجاح وأصبحت جاهزة للموسم الجديد!");
+        }
+
         function handleRegionClick(regionId) {
             const region = state.regions.find(r => r.id === regionId);
             if (!region) return;
@@ -712,9 +732,14 @@
                 return;
             }
 
-            if (!state.isStarted) {
+            if (state.gameStatus === 'ended') {
+                alert("🏁 المسابقة الحالية انتهت وتم اعتماد نتائجها.\nلا يمكن تعديل أو فتح مناطق جديدة إلا بعد بدء موسم جديد.");
+                return;
+            }
+
+            if (state.gameStatus === 'not_started') {
                 const startNow = confirm(`⚠️ المسابقة لم تبدأ بعد!\nهل ترغبين في بدء المسابقة الآن واختيار (${region.name})؟`);
-                if (startNow) toggleStartCompetition();
+                if (startNow) handleGameFlowAction();
                 else return;
             }
 
@@ -757,14 +782,14 @@
                     </div>
                 `;
             } else {
-                icon.innerText = state.isStarted ? "🎯" : "🔒";
+                icon.innerText = state.gameStatus === 'active' ? "🎯" : "🔒";
                 content.innerHTML = `
                     <div class="bg-gray-50 p-5 rounded-2xl border border-gray-200 text-gray-700">
                         <div class="text-base font-extrabold text-[#2D3C59] mb-2">
-                            ${state.isStarted ? 'المنطقة لم تُستملك بعد!' : 'بانتظار انطلاق المسابقة!'}
+                            ${state.gameStatus === 'active' ? 'المنطقة لم تُستملك بعد!' : 'بانتظار انطلاق المسابقة!'}
                         </div>
                         <p class="text-sm text-emerald-800 font-bold leading-relaxed">
-                            ${state.isStarted ? '✨ هذه المنطقة متاحة الآن، يمكن اختيارها في الجولة القادمة!' : '⏳ ستبدأ المنافسة على هذه المنطقة فور إعطاء المعلمة إشارة البدء.'}
+                            ${state.gameStatus === 'active' ? '✨ هذه المنطقة متاحة الآن، يمكن اختيارها في الجولة القادمة!' : '⏳ ستبدأ المنافسة على هذه المنطقة فور إعطاء المعلمة إشارة البدء.'}
                         </p>
                         <p class="text-xs text-gray-400 mt-2">النقاط سرية ومحجوبة 🔒 وتُمنح للمجموعة الفائزة فور اختيارها.</p>
                     </div>
@@ -783,15 +808,26 @@
         }
 
         function finalizeCompetitionIfUnlocked() {
-            if (!isTeacherUnlocked) {
+            if (!isTeacherUnlocked && state.gameStatus !== 'ended') {
                 alert("🔒 إعلان النتائج والختام مخصص للمعلمة فقط.");
                 toggleAdminAuth();
                 return;
             }
+
+            if (isTeacherUnlocked && state.gameStatus === 'active') {
+                const endConfirm = confirm("🏁 هل تودين إنهاء المسابقة الحالية رسمياً وتتويج الفائزين؟\n(سيتم قفل اختيار المناطق واعتماد لوحة الشرف).");
+                if (endConfirm) {
+                    state.gameStatus = 'ended';
+                    state.latestEvent = "🏆 اختُتمت المسابقة المباركة وتم اعتماد النتائج النهائية وتتويج الفرق الفائزة!";
+                    saveLocalState();
+                    updateCompetitionStatusDisplay();
+                    applyLockUI();
+                }
+            }
+
             finalizeCompetition();
         }
 
-        // اعتماد الاستلام المباشر للمنطقة ومنح النقاط للمجموعة
         function confirmDirectAward() {
             const region = state.regions.find(r => r.id === currentActiveRegionId);
             const selectedTeamId = parseInt(document.getElementById('modalTeamSelect').value);
@@ -799,7 +835,6 @@
 
             if (!region || !winnerTeam) return;
 
-            // خصم نقاط المنطقة من المالك السابق إن وجد
             if (region.capturedBy && region.capturedBy !== winnerTeam.id) {
                 const prevTeam = state.teams.find(t => t.id === region.capturedBy);
                 if (prevTeam) prevTeam.mapScore = Math.max(0, (prevTeam.mapScore || 0) - region.points);
@@ -810,7 +845,7 @@
 
             state.latestEvent = `🎉 تم استلام (${region.name}) من قبل (${winnerTeam.name}) ونالت ${region.points} نقطة سرية في درجات المناطق!`;
 
-            saveState();
+            saveLocalState();
             closeModal('regionActionModal');
             renderMap();
             renderTeams();
@@ -819,7 +854,6 @@
             triggerCelebration(winnerTeam.name, region.name, region.points);
         }
 
-        // رصد درجات المعايير المفصولة لكل معيار على حدة (دون التأثير على أي فريق آخر)
         function adjustSpecificCriteria(teamId, type, delta, label) {
             if (!isTeacherUnlocked) {
                 alert("🔒 يجب فتح القفل الخاص بالمعلمة لتعديل درجات المعايير!");
@@ -838,7 +872,7 @@
 
             state.latestEvent = `تم رصد (${delta > 0 ? '+' : ''}${delta}) في [${label}] لمجموعة (${team.name})`;
             
-            saveState();
+            saveLocalState();
             renderTeams();
             document.getElementById('latestEventText').innerText = state.latestEvent;
         }
@@ -939,7 +973,7 @@
                     poly.setAttribute('stroke-width', '2');
 
                     if (badge) {
-                        badge.textContent = state.isStarted ? '🔓 متاحة' : '🔒 سرية';
+                        badge.textContent = state.gameStatus === 'active' ? '🔓 متاحة' : '🔒 سرية';
                         badge.setAttribute('fill', '#FFFFFF');
                         badge.setAttribute('opacity', '0.9');
                     }
@@ -979,12 +1013,12 @@
             };
 
             state.teams.push(newTeam);
-            saveState();
+            saveLocalState();
 
             nameInput.value = '';
             membersInput.value = '';
             renderTeams();
-            alert(`✅ تمت إضافة (${name}) بنجاح!`);
+            alert(`✅ تمت إضافة (${name}) بنجاح! تذكري الضغط على (اعتماد ونشر التحديثات) بعد الانتهاء.`);
         }
 
         function deleteTeam(id) {
@@ -996,7 +1030,7 @@
             });
 
             state.teams = state.teams.filter(t => t.id !== id);
-            saveState();
+            saveLocalState();
             renderMap();
             renderTeams();
         }
@@ -1026,7 +1060,7 @@
                 .map(m => m.trim())
                 .filter(m => m.length > 0);
 
-            saveState();
+            saveLocalState();
             closeModal('editTeamModal');
             renderMap();
             renderTeams();
@@ -1048,7 +1082,6 @@
                 return;
             }
 
-            // ترتيب الفرق تنازلياً بحسب المجموع الكلي
             const sorted = [...state.teams].sort((a, b) => {
                 const totalA = (a.attendanceScore || 0) + (a.sardScore || 0) + (a.hifzScore || 0) + (a.mapScore || 0);
                 const totalB = (b.attendanceScore || 0) + (b.sardScore || 0) + (b.hifzScore || 0) + (b.mapScore || 0);
@@ -1084,7 +1117,6 @@
                         </div>
                     </div>
 
-                    <!-- تفصيل الدرجات المنفصلة المعروضة للطالبات -->
                     <div class="mt-3 bg-white p-2.5 rounded-xl border border-gray-100">
                         <div class="text-[11px] font-bold text-gray-500 mb-2 flex items-center justify-between">
                             <span>📊 تفصيل درجات التقييم:</span>
@@ -1124,7 +1156,6 @@
                         `).join('') : '<span class="text-gray-400 text-[11px]">لا توجد مناطق بعد</span>'}
                     </div>
 
-                    <!-- أزرار رصد درجات المعايير (+3/-3, +4/-4) - تظهر فقط عند فتح قفل المعلمة -->
                     ${isTeacherUnlocked ? `
                     <div class="mt-3 pt-2 border-t border-gray-100 flex flex-wrap items-center justify-between gap-2 text-xs">
                         <div class="flex items-center gap-1">
