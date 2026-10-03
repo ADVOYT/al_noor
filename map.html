@@ -115,7 +115,7 @@
             <!-- الشرح المطور والاحترافي للمسابقة -->
             <div class="bg-white/10 backdrop-blur-md rounded-2xl p-5 md:p-6 border border-white/15 mb-6 text-center leading-relaxed text-gray-100">
                 <p class="text-sm md:text-base font-bold mb-3">
-                    تعتمد المسابقة على الاستحواذ على مناطق الخريطة لجمع أكبر قدر من النقاط .
+                    تعتمد المسابقة على الاستحواذ على مناطق الخريطة لجمع أكبر قدر من النقاط السرية.
                 </p>
                 <p class="text-xs md:text-sm font-medium mb-3">
                     <span class="text-amber-200 font-extrabold bg-black/20 px-2 py-0.5 rounded-md">آلية التحدي:</span> 
@@ -183,9 +183,11 @@
                         </linearGradient>
                     </defs>
 
+                    <!-- ظل المجسم السفلي -->
                     <path d="M 70,360 L 170,510 L 220,555 L 260,650 L 330,795 L 365,850 L 400,920 L 435,890 L 610,870 L 965,750 L 980,630 L 910,640 L 590,830 L 420,865 L 380,885 L 345,820 L 245,630 L 150,480 Z" 
                           fill="rgba(0, 0, 0, 0.14)" filter="blur(10px)"/>
 
+                    <!-- سماكة التجسيم الـ 3D الجانبي -->
                     <path id="extrusionWall" d="
                         M 60,325 L 125,390 L 140,410 L 170,470 L 210,525 L 245,620 L 290,710 L 325,765 L 350,815 L 380,850 L 405,890 L 425,855 
                         L 590,835 L 720,790 L 945,715 L 945,735 L 720,810 L 590,855 L 425,875 L 405,910 L 380,870 L 350,835 L 325,785 L 290,730 
@@ -438,7 +440,7 @@
         <div class="bg-white max-w-2xl w-full rounded-[3rem] p-6 md:p-10 shadow-2xl border border-gray-100 text-center relative overflow-hidden">
             <button onclick="closeModal('finalPodiumModal')" class="absolute top-6 left-6 text-gray-400 hover:text-gray-700 text-xl font-bold">✕</button>
             <span class="text-6xl inline-block mb-3 animate-bounce">👑</span>
-            <h2 class="text-3xl font-extrabold text-[#2D3C59] mb-1">النتائج الختامية لمسابقة الخريطة</h2>
+            <h2 class="text-3xl font-extrabold text-[#2D3C59] mb-1">النتائج الختامية للمسابقة</h2>
             <p class="text-sm text-gray-500 mb-6">مبارك لجميع المجموعات المشاركة هذا الإنجاز المبارك 🌟</p>
             
             <div id="podiumCardsContainer" class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end"></div>
@@ -527,6 +529,7 @@
             checkAndPlayLatestCelebrationOnLoad();
         });
 
+        // ================== نظام التحديث المعزول والآمن (Immutable State) ==================
         function saveLocalState() {
             if (isTestMode) return; // منع الحفظ نهائياً في الوضع التجريبي
             localStorage.setItem('saudi_3d_competition_data', JSON.stringify(state));
@@ -582,7 +585,7 @@
                 toggleBtn.classList.replace('bg-amber-100', 'bg-rose-100');
                 toggleBtn.classList.replace('text-amber-800', 'text-rose-800');
                 if (publishBtn) publishBtn.classList.add('opacity-50', 'pointer-events-none');
-                alert("🧪 تم تفعيل الوضع التجريبي!\n\nيمكنكِ الآن إجراء أي تعديلات واختبار الأزرار براحتكِ؛ لن يتم حفظها في جهازكِ ولن تُرسل للطالبات.");
+                alert("🧪 تم تفعيل الوضع التجريبي!\n\nيمكنكِ الآن إجراء أي تعديلات واختبار الأزرار بحرية؛ لن يتم حفظ أي شيء في جهازكِ ولن تُرسل أي بيانات للطالبات.");
             } else {
                 banner.classList.add('hidden');
                 toggleBtn.innerHTML = "🧪 تفعيل الوضع التجريبي";
@@ -691,18 +694,20 @@
             renderTeams();
         }
 
-        // ================== تصفير المعايير الأسبوعية (حذف نهائي) ==================
+        // ================== تصفير المعايير الأسبوعية (حذف نهائي آمن) ==================
         function resetWeeklyCriteriaScores() {
             if (!isTeacherUnlocked) return;
 
             const confirmReset = confirm("⚠️ تأكيد الحذف النهائي:\n\nهل أنتِ متأكدة من تصفير درجات (الحضور، السرد، الحفظ) لجميع الفرق بصفر نهائياً لبدء أسبوع جديد؟\n\n(المناطق المستلمة في الخريطة ستظل محفوظة بالكامل).");
             if (!confirmReset) return;
 
-            state.teams.forEach(team => {
-                team.attendanceScore = 0;
-                team.sardScore = 0;
-                team.hifzScore = 0;
-            });
+            // تحديث معزول وآمن (Immutable)
+            state.teams = state.teams.map(team => ({
+                ...team,
+                attendanceScore: 0,
+                sardScore: 0,
+                hifzScore: 0
+            }));
 
             state.latestEvent = "تم تصفير درجات المعايير الأسبوعية نهائياً لبدء جولة جديدة، مع بقاء مناطق الخريطة كما هي 🌟";
             
@@ -727,10 +732,10 @@
                 state.latestEvent = "🔥 انطلقت المسابقة رسمياً! الخريطة مفتوحة الآن لاستحواذ الفرق المتصدرة على المناطق.";
                 if (window.confetti) confetti({ particleCount: 70, spread: 80 });
             } else if (state.gameStatus === 'active') {
-                alert("ℹ️ المسابقة جارية حالياً ولا يمكن فتح مسابقة أخرى بالتوازي.\nلإنهاء هذه المسابقة وتتويج الفائز، اضغطي على زر (🏆 إعلان الختام).");
+                alert("ℹ️️ المسابقة جارية حالياً ولا يمكن فتح مسابقة أخرى بالتوازي.\nلإنهاء هذه المسابقة وتتويج الفائز، اضغطي على زر (🏆 إعلان الختام).");
                 return;
             } else if (state.gameStatus === 'ended') {
-                alert("🏁 هذه المسابقة انتهت وتم اعتماد نتائجها.\nلبدء مسابقة جديدة بالكامل، افتحي نافذة إعلان الختام واضغطي (أرشفة وتصفير).");
+                alert("🏁 هذه المسابقة انتهت وتم اعتماد نتائجها.\nلبدء مسابقة جديدة بالكامل، افتحي نافذة إعلان الختام واضغطي الزر الأحمر.");
                 return;
             }
 
@@ -768,7 +773,7 @@
             latestEvent.innerText = state.latestEvent;
         }
 
-        // ================== تصفير المسابقة بالكامل (حذف نهائي) ==================
+        // ================== تصفير المسابقة بالكامل (حذف نهائي آمن) ==================
         function resetAndStartFreshGame() {
             if (!isTeacherUnlocked) return;
             const confirmReset = confirm("⚠️ تحذير بالحذف النهائي:\n\nهل أنتِ متأكدة من تصفير مناطق الخريطة وجميع الدرجات بالكامل بصفر (0) لبدء مسابقة جديدة كلياً؟\n(هذا الإجراء يحذف النتائج السابقة نهائياً ولا يمكن التراجع عنه).");
@@ -776,8 +781,8 @@
 
             state.gameStatus = 'not_started';
             state.regions = defaultRegions.map(r => ({ ...r, capturedBy: null }));
-            state.teams = state.teams.map(t => ({
-                ...t,
+            state.teams = state.teams.map(team => ({
+                ...team,
                 attendanceScore: 0,
                 sardScore: 0,
                 hifzScore: 0,
@@ -898,20 +903,39 @@
             finalizeCompetition();
         }
 
+        // ================== تحديثات آمنة للمناطق (Immutable Data) ==================
         function confirmDirectAward() {
-            const region = state.regions.find(r => r.id === currentActiveRegionId);
+            const regionId = currentActiveRegionId;
             const selectedTeamId = parseInt(document.getElementById('modalTeamSelect').value);
+            
+            const region = state.regions.find(r => r.id === regionId);
             const winnerTeam = state.teams.find(t => t.id === selectedTeamId);
 
             if (!region || !winnerTeam) return;
 
-            if (region.capturedBy && region.capturedBy !== winnerTeam.id) {
-                const prevTeam = state.teams.find(t => t.id === region.capturedBy);
-                if (prevTeam) prevTeam.mapScore = Math.max(0, (prevTeam.mapScore || 0) - region.points);
-            }
+            // تحديث درجات الفرق بأمان تام
+            state.teams = state.teams.map(t => {
+                let newMapScore = t.mapScore || 0;
+                
+                // سحب النقاط من الفريق القديم لو كان يمتلكها
+                if (region.capturedBy !== null && region.capturedBy !== winnerTeam.id && t.id === region.capturedBy) {
+                    newMapScore = Math.max(0, newMapScore - region.points);
+                }
+                // إضافة النقاط للفريق الفائز
+                if (t.id === winnerTeam.id && region.capturedBy !== winnerTeam.id) {
+                    newMapScore += region.points;
+                }
+                
+                return { ...t, mapScore: newMapScore };
+            });
 
-            region.capturedBy = winnerTeam.id;
-            winnerTeam.mapScore = (winnerTeam.mapScore || 0) + region.points;
+            // تحديث حالة المنطقة
+            state.regions = state.regions.map(r => {
+                if (r.id === regionId) {
+                    return { ...r, capturedBy: winnerTeam.id };
+                }
+                return r;
+            });
 
             state.latestEvent = `🎉 استحوذت (${winnerTeam.name}) على (${region.name}) ونالت ${region.points} نقطة سرية في درجات الخريطة!`;
 
@@ -924,23 +948,32 @@
             triggerCelebration(winnerTeam.name, region.name, region.points);
         }
 
+        // ================== تحديثات آمنة للمعايير (Immutable Data) ==================
         function adjustSpecificCriteria(teamId, type, delta, label) {
             if (!isTeacherUnlocked) {
                 alert("🔒 يجب فتح القفل الخاص بالمعلمة لتعديل درجات المعايير!");
                 return;
             }
-            const team = state.teams.find(t => t.id === teamId);
-            if (!team) return;
 
-            if (type === 'attendance') {
-                team.attendanceScore = (team.attendanceScore || 0) + delta;
-            } else if (type === 'sard') {
-                team.sardScore = (team.sardScore || 0) + delta;
-            } else if (type === 'hifz') {
-                team.hifzScore = (team.hifzScore || 0) + delta;
-            }
+            let updatedTeamName = "";
 
-            state.latestEvent = `تم رصد (${delta > 0 ? '+' : ''}${delta}) في [${label}] لمجموعة (${team.name})`;
+            // التحديث الآمن (يستحيل تداخل النقاط بين الفرق نهائياً)
+            state.teams = state.teams.map(t => {
+                if (t.id === teamId) {
+                    updatedTeamName = t.name;
+                    return {
+                        ...t,
+                        attendanceScore: type === 'attendance' ? (t.attendanceScore || 0) + delta : (t.attendanceScore || 0),
+                        sardScore: type === 'sard' ? (t.sardScore || 0) + delta : (t.sardScore || 0),
+                        hifzScore: type === 'hifz' ? (t.hifzScore || 0) + delta : (t.hifzScore || 0)
+                    };
+                }
+                return t;
+            });
+
+            if(!updatedTeamName) return;
+
+            state.latestEvent = `تم رصد (${delta > 0 ? '+' : ''}${delta}) في [${label}] لمجموعة (${updatedTeamName})`;
             
             saveLocalState();
             renderTeams();
@@ -1071,8 +1104,9 @@
                 .map(m => m.trim())
                 .filter(m => m.length > 0);
 
+            // إضافة مُعرف فريد وآمن
             const newTeam = {
-                id: Date.now(),
+                id: Date.now() + Math.floor(Math.random() * 10000),
                 name: name,
                 members: members,
                 attendanceScore: 0,
@@ -1094,8 +1128,9 @@
             if (!isTeacherUnlocked) return alert("🔒 خاص بالمعلمة فقط.");
             if (!confirm("هل أنتِ متأكدة من حذف هذه المجموعة بشكل نهائي؟")) return;
 
-            state.regions.forEach(r => {
-                if (r.capturedBy === id) r.capturedBy = null;
+            state.regions = state.regions.map(r => {
+                if (r.capturedBy === id) return { ...r, capturedBy: null };
+                return r;
             });
 
             state.teams = state.teams.filter(t => t.id !== id);
@@ -1123,11 +1158,15 @@
             const name = document.getElementById('editTeamNameInput').value.trim();
             if (!name) return alert("الرجاء إدخال الاسم!");
 
-            team.name = name;
-            team.members = document.getElementById('editTeamMembersInput').value
+            const newMembers = document.getElementById('editTeamMembersInput').value
                 .split(/[\n,]+/)
                 .map(m => m.trim())
                 .filter(m => m.length > 0);
+
+            state.teams = state.teams.map(t => {
+                if(t.id === id) return { ...t, name: name, members: newMembers };
+                return t;
+            });
 
             saveLocalState();
             closeModal('editTeamModal');
@@ -1220,8 +1259,9 @@
 
                     <div class="mt-2 text-xs bg-white p-2 rounded-xl border border-gray-100 flex flex-wrap gap-1 items-center">
                         <span class="text-gray-400 font-medium text-[11px]">المناطق:</span>
+                        <!-- تم إصلاح عرض اسم الشرقية والشمالية هنا -->
                         ${capturedRegions.length > 0 ? capturedRegions.map(r => `
-                            <span class="bg-[#94A378]/20 text-[#364222] font-bold px-2 py-0.5 rounded-lg text-[11px]">${r.name.replace('منطقة ', '')}</span>
+                            <span class="bg-[#94A378]/20 text-[#364222] font-bold px-2 py-0.5 rounded-lg text-[11px]">${r.name.replace('منطقة ', '').replace('المنطقة ', '')}</span>
                         `).join('') : '<span class="text-gray-400 text-[11px]">لا توجد مناطق بعد</span>'}
                     </div>
 
